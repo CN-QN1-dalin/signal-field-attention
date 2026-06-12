@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# MLX
+*.mlx
+mlx_models/
+
+# Data / outputs
+*.json
+*.pkl
+*.pt
+*.pth
+*.npy
+*.npz
+results/
+output/
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Virtual env
+.venv/
+venv/
+env/
