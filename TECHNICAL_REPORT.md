@@ -171,7 +171,23 @@ While LoRA (Hu et al., 2022) is designed for fine-tuning rather than inference a
 3. Current evaluation focuses on autoregressive language modeling; other modalities are not tested
 4. The optimal compression size k may vary across model architectures and tasks
 
-### 4.4 Scope and Reproducibility
+### 4.4 Comparison with MiniMax Sparse Attention (MSA)
+
+MiniMax recently introduced MiniMax Sparse Attention (MSA, Lai et al. 2026, arXiv:2606.13392), a blockwise sparse attention mechanism targeting ultra-long context (1M tokens) on 109B models. While both MSA and SFA aim to reduce the quadratic cost of attention, the two approaches differ fundamentally:
+
+| Aspect | MSA | SFA |
+|--------|-----|-----|
+| Strategy | Blockwise sparsity + GQA Top-k selection | Dual-channel: exact near-field + compressed far-field |
+| Target scale | 109B model, 1M context | 0.5B–7B models, practical deployment |
+| Approach | Sparse matrix with learned index | State-space compression with EWMA |
+| Decoding speedup | 7.6× (H800, co-designed kernel) | 4.16× (MLX on Apple Silicon) |
+| Compute reduction | 28.4× per-token compute | O(n²) → O(k·n) |
+| Deployment barrier | Requires GPU kernel co-design | Drop-in replacement, Python only |
+| Hardware dependency | H800-specific optimization | Any platform (Python + standard lib) |
+
+**Key distinction**: MSA is optimized for massive models with specialized GPU kernels. SFA targets lightweight deployment on commodity hardware (MacBooks, edge devices) with minimal infrastructure requirements. The two approaches are complementary: MSA solves "how to handle 1M tokens at scale", while SFA solves "how to enable long-context on any device".
+
+### 4.5 Scope and Reproducibility
 
 All experiments were conducted on Qwen2.5 models using the MLX framework on Apple Silicon hardware. The pure-Python experiment scripts in the `01-` through `08-` directories use only the standard library and can be run on any platform. Full model experiments in `src/` require MLX.
 
@@ -206,6 +222,7 @@ The approach is designed as a drop-in replacement for attention layers in existi
 15. Ainslie, J., Lee-Thorp, J., de Jong, M., Fermigier, Y., Sanghai, S., & Calhoun, Y. (2023). GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints. *EMNLP*.
 16. Voita, E., Talbot, D., Moiseev, F., Sennrich, R., & Titov, I. (2019). Analyzing Multi-Head Self-Attention: Specialized Heads Do the Job, All Head Together Work Well. *NeurIPS*.
 17. Clark, K., Khandelwal, U., Levy, O., & Manning, C. D. (2019). What Does BERT Look At? An Analysis of BERT's Attention. *ACL Workshop*.
+18. Lai, X., et al. (2026). MiniMax Sparse Attention. *arXiv:2606.13392*.
 
 ---
 

@@ -1,6 +1,6 @@
-# Signal Field Attention (SFA)
+# QN1 Engine: Signal Field Attention & Efficient Inference Suite
 
-An efficient attention mechanism that replaces O(n²) self-attention with an O(k·n) dual-channel signal-based approach. Achieves 4× decoding speedup and 248× memory compression on 7B models while maintaining competitive perplexity.
+A suite of eight efficient attention and inference acceleration techniques, anchored by Signal Field Attention (SFA). Replaces O(n²) self-attention with an O(k·n) dual-channel approach. Achieves 4× decoding speedup and 248× memory compression on 7B models while maintaining competitive perplexity.
 
 ## Overview
 
@@ -33,7 +33,7 @@ The two channels are fused with a learnable mixing coefficient, preserving exact
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/signal-field-attention.git
+git clone https://github.com/CN-QN1-dalin/signal-field-attention.git
 cd signal-field-attention
 
 # Install MLX (Apple Silicon only, for full model experiments)
@@ -147,9 +147,8 @@ python3 taicu_7b_ppl_verify.py
 │   └── taicu_7b_ppl_verify.py   # PPL validation
 │
 ├── OPEN_SOURCE.md               # Detailed open-source declaration
-├── TECHNICAL_REPORT.md           # Full technical report
-├── ORIGINALITY_ANALYSIS.md      # Prior art analysis
-└── COMPLETION.md                # Experiment completion report
+├── TECHNICAL_REPORT.md          # Full technical report
+└── LICENSE                      # MIT License
 ```
 
 ## Experiment Suite Details
@@ -207,9 +206,9 @@ The `src/` directory contains MLX implementations for full model experiments on 
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
 
-**Commercial use**: Contact for licensing terms.
+Free for personal, academic, and educational use. For commercial licensing inquiries, contact: 362118251@qq.com
 
 ## Citation
 
@@ -220,7 +219,7 @@ If you find this work useful, please cite:
   author = {Taicu Team},
   title = {Signal Field Attention: Learning to Compress Attention for Efficient Inference},
   year = {2026},
-  howpublished = {\url{https://github.com/your-username/signal-field-attention}},
+  howpublished = {\url{https://github.com/CN-QN1-dalin/signal-field-attention}},
   note = {Technical Report v1.0}
 }
 ```
