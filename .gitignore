@@ -38,3 +38,9 @@ Thumbs.db
 .venv/
 venv/
 env/
+
+# WeChat temporary files
+/var/folders/**/
+/tmp/*.md
+/tmp/*.png
+/tmp/*.jpg
