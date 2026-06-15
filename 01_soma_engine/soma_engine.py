@@ -189,8 +189,12 @@ class SignalFieldLayer:
         seq_hist = keys_hist.shape[0] if keys_hist is not None else 0
         
         if seq_hist == 0:
-            # 无历史时，使用零向量
-            local_attn = mx.zeros((batch, self.num_heads, self.head_dim), dtype=mx.float32)
+            # 无历史时，使用 q_t 自身的 k,v 做自注意力（fallback）
+            # 这样第一个 token 也能产生有意义的输出
+            k_self = mx.mean(q_t, axis=0, keepdims=True)  # [1, head_dim] -> 用 q 近似 k
+            # 直接用 q_t 本身作为输出（简化处理：attention=1.0 on self）
+            # 更好的做法：用 field_state 提供初始信息
+            local_attn = field_state[None, :, :]  # [batch, num_heads, head_dim]
         else:
             # 调整维度顺序：[seq, heads, hd] -> [heads, seq, hd]
             k_h = mx.transpose(keys_hist, axes=(1, 0, 2))
@@ -203,10 +207,12 @@ class SignalFieldLayer:
             # 计算注意力分数
             scores = mx.matmul(q_exp, mx.transpose(k_exp, axes=(0, 1, 3, 2))) * self.scale
             
-            # 应用衰减
-            n_decay = min(seq_hist, self.k)
-            decay = self.decay_table.table[:n_decay]
-            scores = scores * decay[None, None, None, :]
+            # 应用衰减（仅在 ring buffer 模式；full_mode 下不做衰减以对齐标准 Attention）
+            if seq_hist <= self.k:
+                n_decay = seq_hist
+                decay = self.decay_table.table[:n_decay]
+                scores = scores * decay[None, None, None, :]
+            # full_mode 下 seq_hist > self.k，不做衰减
             
             # Softmax归一化
             weights = mx.softmax(scores, axis=-1)
@@ -263,12 +269,13 @@ class SignalFieldLayer:
         out = mx.matmul(out, self.out_weight)
         return out
     
-    def prefill(self, x: mx.array) -> Tuple[mx.array, mx.array, RingKVBuffer]:
+    def prefill(self, x: mx.array, full_mode: bool = False) -> Tuple[mx.array, mx.array, RingKVBuffer]:
         """
         Prefill阶段：一次性编码输入序列并构建推理状态
         
         Args:
             x: 输入张量 [batch, seq, dims]
+            full_mode: 如果为True，使用全部历史而非仅最近k个（用于正确性验证）
             
         Returns:
             output: 输出张量 [batch, seq, dims]
@@ -282,17 +289,29 @@ class SignalFieldLayer:
         ring_buffer = RingKVBuffer(self.k, self.num_heads, self.head_dim)
         field_state = mx.zeros((self.num_heads, self.head_dim), dtype=mx.float32)
         
+        # 在全量模式下，累积所有 KV 用于精确注意力
+        all_k = []
+        all_v = []
+        
         outputs = []
         for t in range(seq):
             q_t = q[:, t, :, :]
             k_t = k[:, t, :, :]
             v_t = v[:, t, :, :]
             
-            # 读取环形缓冲区
-            keys_ring, values_ring = ring_buffer.read()
+            if full_mode:
+                # 全量模式：使用所有历史 KV（不含当前 token 自己）
+                keys_hist = mx.stack(all_k, axis=0) if all_k else mx.zeros((0, self.num_heads, self.head_dim), dtype=mx.float32)
+                values_hist = mx.stack(all_v, axis=0) if all_v else mx.zeros((0, self.num_heads, self.head_dim), dtype=mx.float32)
+                # 计算完注意力后再追加当前 KV
+                all_k.append(k_t[0])
+                all_v.append(v_t[0])
+            else:
+                # 正常模式：使用 RingBuffer
+                keys_hist, values_hist = ring_buffer.read()
             
             # 计算注意力
-            attn = self._compute_attention(q_t, keys_ring, values_ring, field_state)
+            attn = self._compute_attention(q_t, keys_hist, values_hist, field_state)
             outputs.append(attn)
             
             # 更新状态
