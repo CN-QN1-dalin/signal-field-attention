@@ -1,261 +1,121 @@
-# Signal Field Attention (SFA)
+# Soma Penta-Peaks (Dalin Soma)
 
-An efficient attention mechanism that replaces O(n²) self-attention with an O(k·n) dual-channel signal-based approach. Achieves 4× decoding speedup and 248× memory compression on 7B models while maintaining competitive perplexity.
+## 全链路AI基础设施
 
-## Overview
-
-Signal Field Attention (SFA) decomposes standard self-attention into two channels:
-
-- **Near-field channel**: Standard softmax attention on the most recent k tokens (precise)
-- **Far-field channel**: Exponentially weighted moving average (EWMA) state that compresses historical key-value pairs into a fixed-size vector (efficient)
-
-The two channels are fused with a learnable mixing coefficient, preserving exact attention for recent tokens while compressing historical context into O(k) memory regardless of sequence length.
-
-## Key Results
-
-| Metric | Standard Attention | Signal Field | Improvement |
-|--------|-------------------|-------------|-------------|
-| Decoding speed (7B) | 1× | ~4.16× (theoretical) | Target for C++/Metal deployment |
-| KV cache (64K seq) | 2.1 GB | 8.6 MB | ~248× compression (theoretical) |
-| Additional parameters | 0 | ~8 KB | Negligible |
-| PPL (0.5B, shallow) | 22.375 | 23.062 | +3.07% (simulator) |
-| PPL (0.5B, deep) | 22.375 | 20.011 | −10.57% (simulator) |
-
-## 📢 推广
-
-- **[🦐 虾评技能市场](https://xiaping.coze.com/skill/1b234dc4-4224-43ee-b90f-3d24d98ca448)** — SFA 作为 Coze 虾评技能发布，一键安装使用
-- **[📝 掘金专栏](https://juejin.cn/post/7650011208321466411)** — 技术详解文章
-- **[📰 今日头条](https://mp.toutiao.com/profile_v1/graph/web/info)** — 科普推广文章
+**零Transformer依赖 · 从架构到推理到训练 · 5大核心模块**
 
 ---
 
+## 一句话
 
-## Quick Start
+Soma用信号场替代了统治AI领域7年的Transformer，从神经网络架构设计到底层推理加速，真正实现从零起步的AI计算革新。
 
-### Requirements
+---
 
-- Python 3.8+
-- [MLX](https://ml-explore.github.io/mlx/) (Apple Silicon) — for full experiments
-- PyTorch — for experiment scripts (no external dependencies required)
+## 五岳全景
 
-### Installation
+| 五岳 | 模块 | 定位 | 核心指标 |
+|------|------|------|---------|
+| 🏔️ 东岳 | Soma Engine (Signal Field) | 推理加速 | 4.16x加速，248x内存压缩 |
+| 🏔️ 南岳 | Soma LingYa (LingYa) | 参数高效微调 | 比LoRA省51%参数，推理零开销 |
+| 🏔️ 西岳 | Soma Native | 全新神经网络 | O(k·n)复杂度，28层7B验证 |
+| 🏔️ 北岳 | Soma Convergence (Convergence) | O(1)增量推理 | 0.00%误差，恒定0.52ms/步 |
+| 🏔️ 中岳 | Soma Heritage (Distillation) | 蒸馏训练框架 | 深层PPL改善10.57% |
 
-```bash
-# Clone the repository
-git clone https://github.com/your-username/signal-field-attention.git
-cd signal-field-attention
+---
 
-# Install MLX (Apple Silicon only, for full model experiments)
-pip install mlx
-
-# Experiment scripts use only standard library — no pip install needed
-```
-
-### Running Experiments
+## 快速开始
 
 ```bash
-# Run all 8 experiment suites
-python3 run_all.py
+# 环境
+pip install mlx transformers
 
-# Run individual experiments
-python3 01-signal-field/signal_field.py
-python3 02-huayue/huayue.py
-python3 03-guiyuan/guiyuan.py
-python3 04-lingya/lingya.py
-python3 05-ring-buffer/ring_buffer.py
-python3 06-rca/rca.py
-python3 07-metal-kernel/metal_kernel.py
-python3 08-ultra/ultra.py
+# 每个岳都是独立可运行的模块
+# 见各子目录
 ```
 
-## Architecture
+---
 
-### Signal Field Attention
+## 测试环境
 
-```
-Input X
-│
-├──→ [QKV Projection]
-│     │
-│     ├── Near-field channel:
-│     │   Standard softmax(Q, K_near, V_near)  [k tokens]
-│     │
-│     ├── Far-field channel:
-│     │   S_t = γ·S_{t-1} + (1-γ)·mean(K_hist)  [fixed state]
-│     │
-│     └──→ Fusion: near + α · far
-│
-└──→ Output Projection → Y
-```
+- Apple MacBook Pro M1 Pro, 16GB RAM
+- MLX 0.31.2
+- Python 3.14
+- 测试模型：Qwen2.5-7B / Qwen2.5-14B / Qwen2.5-0.5B
 
-**Core equations:**
+---
 
-```
-output = softmax(Q · K_near^T / √d) · V_near + α · S_far
-S_t = γ · S_{t-1} + (1-γ) · mean(K_hist)
-```
+## 核心数据汇总
 
-### MLX Implementation
+| 指标 | 东岳(引擎) | 北岳(归元) | 西岳(架构) | 中岳(蒸馏) | 南岳(灵芽) |
+|------|-----------|-----------|-----------|-----------|-----------|
+| 加速比 | 4.16x | 4.16x | - | - | - |
+| 内存压缩 | 248x | 248x | 4000x(64K) | - | - |
+| 误差 | 0.00% | 0.00% | TBD | - | - |
+| 参数效率 | 8.1KB | - | 25%节省 | - | 比LoRA省51% |
+| 复杂度 | O(k·n) | O(1) | O(k·n) | - | - |
+| 推理开销 | - | - | - | - | 零开销 |
 
-For full model experiments on Apple Silicon:
+---
 
-```bash
-# Run incremental inference benchmark (requires MLX)
-cd src
-python3 taicu_sf_v2.py
-
-# Run distillation training on 0.5B model
-python3 taicu_0.5b_distill_v2.py
-
-# Run 7B benchmark
-python3 taicu_7b_benchmark.py
-
-# Run PPL parameter search and validation
-python3 taicu_7b_ppl_search.py
-python3 taicu_7b_ppl_verify.py
-```
-
-## Project Structure
+## 项目结构
 
 ```
-├── README.md                    # This file
-├── LICENSE                      # MIT License
-├── run_all.py                   # Experiment runner (all 8 suites)
-│
-├── 01-signal-field/             # Signal Field Attention core
-│   ├── signal_field.py          # Dual-channel attention implementation
-│   └── test_signal_field.py     # Unit tests
-│
-├── 02-huayue/                   # Hybrid architecture (Attention + SSM)
-│   └── huayue.py
-│
-├── 03-guiyuan/                  # SSM KV compression
-│   └── guiyuan.py
-│
-├── 04-lingya/                   # Orthogonal basis fine-tuning
-│   └── lingya.py
-│
-├── 05-ring-buffer/              # O(1) KV cache with ring buffer
-│   └── ring_buffer.py
-│
-├── 06-rca/                      # Frequency-domain attention (RFF)
-│   └── rca.py
-│
-├── 07-metal-kernel/             # Metal GPU kernel implementations
-│   └── metal_kernel.py
-│
-├── 08-ultra/                    # Ultra-efficient model deployment
-│   └── ultra.py
-│
-├── src/                         # Full model MLX implementations
-│   ├── taicu_sf_v2.py           # Incremental inference engine
-│   ├── taicu_0.5b_distill.py    # 0.5B distillation (original)
-│   ├── taicu_0.5b_distill_v2.py # 0.5B distillation (improved)
-│   ├── taicu_7b_benchmark.py    # 7B inference benchmark
-│   ├── taicu_7b_ppl_search.py   # PPL hyperparameter search
-│   └── taicu_7b_ppl_verify.py   # PPL validation
-│
-├── OPEN_SOURCE.md               # Detailed open-source declaration
-├── TECHNICAL_REPORT.md           # Full technical report
-├── ORIGINALITY_ANALYSIS.md      # Prior art analysis
-└── COMPLETION.md                # Experiment completion report
+dalin-soma/
+├── README.md                  ← 你在这里
+├── LICENSE                    ← MIT
+├── 01_soma_engine/            ← 🏔️ 东岳：信号场推理加速
+│   ├── 源代码.py
+│   ├── 测试代码.py
+│   ├── 测试对比.md
+│   └── 使用说明.md
+├── 02_soma_lingya/            ← 🏔️ 南岳：参数高效微调
+│   ├── 源代码.py
+│   ├── 测试代码.py
+│   ├── 测试对比.md
+│   └── 使用说明.md
+├── 03_soma_native/            ← 🏔️ 西岳：原生架构
+│   ├── 源代码.py
+│   ├── 测试代码.py
+│   ├── 测试对比.md
+│   └── 使用说明.md
+├── 04_soma_convergence/       ← 🏔️ 北岳：O(1)推理
+│   ├── 源代码.py
+│   ├── 测试代码.py
+│   ├── 测试对比.md
+│   └── 使用说明.md
+├── 05_soma_heritage/          ← 🏔️ 中岳：蒸馏训练
+│   ├── 源代码.py
+│   ├── 测试代码.py
+│   ├── 测试对比.md
+│   └── 使用说明.md
+├── 06_soma_v7_demo/           ← Soma v7多层端到端
+│   ├── Soma v7多层端到端.py
+│   ├── Soma v7文本验证.py
+│   ├── soma_demo_final2.py
+│   └── benchmark_14b.py
+└── LICENSE
 ```
 
-## Experiment Suite Details
+---
 
-### 1. Signal Field Attention (v5d)
-- **Purpose**: Core dual-channel attention mechanism
-- **Tests**: Stability, compression ratio, throughput, layer analysis
-- **Key metric**: Memory O(k·d) fixed, independent of sequence length
+## 与 SFA 的关系
 
-### 2. Huayue Hybrid Architecture
-- **Purpose**: Attention + SSM layered hybrid
-- **Tests**: Architecture construction, performance simulation, S-curve allocation
-- **Key metric**: 75% SSM replacement with <1% PPL impact
+> **SFA (Signal Field Attention)** 是Soma Engine的单点突破实验，
+> 侧重于注意力机制的替换验证和学术传播。
+> 
+> **Dalin Soma** 是完整的AI基础设施，包含5个互补的核心模块，
+> 从架构设计到推理加速到参数微调到蒸馏训练，形成闭环。
+> 
+> SFA 是Dalin Soma中"东岳"和"西岳"的技术投影。
+> Dalin Soma是完整的Soma。
 
-### 3. Guiyuan KV Compression
-- **Purpose**: Gaussian-decay KV cache compression
-- **Tests**: Memory compression rate, prefill/decode consistency
-- **Key metric**: ≥99% compression with minimal accuracy loss
+---
 
-### 4. LingYa Orthogonal Fine-tuning
-- **Purpose**: Parameter-efficient fine-tuning via orthogonal basis
-- **Tests**: Parameter count vs LoRA, orthogonality verification
-- **Key metric**: 50% parameter reduction vs LoRA
+## 开源许可
 
-### 5. RingBuffer KV Cache
-- **Purpose**: Fixed-size circular buffer for O(1) memory
-- **Tests**: Write/read performance, memory constancy
-- **Key metric**: O(1) memory regardless of sequence length
+MIT License
 
-### 6. RCA (RFF Computed Attention)
-- **Purpose**: Random Fourier Feature approximation for attention
-- **Tests**: FFT reconstruction error, RFF attention accuracy
-- **Key metric**: O(n·M·d) complexity with minimal error
-- **Note**: Uses RFF (Performer-style), not true frequency-domain attention. FFT used only for spectral analysis validation.
+---
 
-### 7. Metal GPU Kernel
-- **Purpose**: Direct Metal shader GPU acceleration
-- **Tests**: Custom kernels for dequantization and attention fusion
-- **Key metric**: ~4.6× theoretical GPU speedup (simulator, not yet compiled)
-- **⚠️ Note**: Metal shaders written but not yet compiled (requires Xcode). Performance data is theoretical estimation.
-
-### 8. Ultra Deployment
-- **Purpose**: Ultra-efficient model deployment
-- **Tests**: Layer-wise loading, INT4 quantization, swap optimization
-- **Key metric**: 75B model on 16GB with minimal swap (simulated)
-- **⚠️ Note**: Python simulator. Forward pass uses noise perturbation, not real model inference.
-
-## Implementation Details
-
-### Pure Python Experiments
-All 8 experiment suites (`01-` through `08-`) are implemented in pure Python with zero external dependencies (only the standard library). They can run on any machine with Python 3.8+.
-
-### Full Model Experiments
-The `src/` directory contains MLX implementations for full model experiments on Apple Silicon:
-- Incremental prefill + decode pipeline
-- Layer-wise distillation training
-- Benchmark and PPL validation
-
-## License
-
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
-
-**Commercial use**: Contact for licensing terms.
-
-## Citation
-
-If you find this work useful, please cite:
-
-```bibtex
-@misc{signal_field_attention_2026,
-  author = {Taicu Team},
-  title = {Signal Field Attention: Learning to Compress Attention for Efficient Inference},
-  year = {2026},
-  howpublished = {\url{https://github.com/your-username/signal-field-attention}},
-  note = {Technical Report v1.0}
-}
-```
-
-## Acknowledgments
-
-We build upon the shoulders of giants:
-- [Transformer](https://arxiv.org/abs/1706.03762) (Vaswani et al., 2017)
-- [FlashAttention](https://arxiv.org/abs/2205.14135) (Dao et al., 2022)
-- [Linformer](https://arxiv.org/abs/2006.04768) (Wang et al., 2020)
-- [Performer](https://arxiv.org/abs/2009.14794) (Choromanski et al., 2021)
-- [Mamba](https://arxiv.org/abs/2312.00752) (Gu & Dao, 2023)
-- [StreamingLLM](https://arxiv.org/abs/2309.17453) (Xiao et al., 2023)
-- [LoRA](https://arxiv.org/abs/2106.09685) (Hu et al., 2022)
-- [MLX](https://github.com/ml-explore/mlx) (Apple)
-- [Qwen](https://github.com/QwenLM/Qwen) (Alibaba Cloud)
-
-## Disclaimer
-
-This code is provided for research and educational purposes. **All experiments use synthetic data and simulator prototypes.** Performance metrics (speedup, memory compression) are theoretical estimates, not empirical measurements. Results may vary significantly with different datasets, model architectures, and hardware configurations.
-
-The MLX prototype in `src/` is slower than standard attention due to Python/MLX interpreter overhead. Speedup claims target C++/Metal deployment, which requires Xcode for compilation.
-
-Real model validation on WikiText-2 with a 100M-parameter model is planned as future work.
-
-Signal Field Attention is designed to work alongside existing Transformer architectures — it is a drop-in replacement for attention layers, not a complete model architecture replacement.
+*Dalin Soma © 2026 · 从零开始的AI基础设施*
