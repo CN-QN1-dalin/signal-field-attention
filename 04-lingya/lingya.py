@@ -5,7 +5,7 @@ LingYa Orthogonal Fine-tuning 灵芽 — 正交基微调
 核心原理：
 - 与LoRA区别：只训练P一个矩阵，不训练A+B
 - P矩阵通过SVD分解获得正交基
-- P零初始化：训练开始时输出为零，不破坏原始模型
+- V零初始化，P为正交基：训练开始时输出为零，不破坏原始模型
 
 验收标准：
 - 3B模型: 灵芽97.584% vs LoRA 97.043%
@@ -110,7 +110,7 @@ class LingyaAdapter:
 class LoRAAdapter:
     """
     标准LoRA: ΔW = B · A
-    A: r×d (零初始化), B: d×r (随机×0.01)
+    V: r×d (零初始化), P: d×r (随机正交基)
     参数: 2×r×d
     """
 

@@ -209,10 +209,11 @@ class SignalFieldAttention:
         output = [local_attn[i] + far[i] for i in range(self.dim)]
 
         # 4. 更新信号场状态 (EMA)
-        k_mean = [sum(k[j] for j in range(self.dim)) / self.dim] * self.dim
+        # 使用 k 的均值作为输入，对齐文档公式 S_t = γ·S_{t-1} + (1-γ)·k̄_t
+        k_mean = sum(k) / self.dim
         for i in range(self.dim):
             self.field_state[i] = (self.gamma * self.field_state[i] +
-                                   (1 - self.gamma) * k[i])
+                                   (1 - self.gamma) * k_mean)
 
         # 5. 写入环形缓冲区
         if len(self.kv_buffer) < self.k:

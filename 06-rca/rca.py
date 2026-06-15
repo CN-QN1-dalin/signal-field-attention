@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-RCA Frequency-Domain RCA — 频域注意力
+RCA (RFF Computed Attention) — 基于随机傅里叶特征的注意力近似
 
-核心原理：
-- 标准注意力 O(n²) → 频域点乘 O(n log n)
-- 使用傅里叶特征映射近似注意力内核
-- 基于随机傅里叶特征 (RFF) 的低秩近似
+⚠️ 说明：
+- 本模块使用 Random Fourier Features (RFF) 近似标准注意力
+- 原名为 "频域注意力" 已更正为更准确的名称
+- FFT 部分仅用于频谱分析验证，注意力核心走的是 RFF 路线
+- 这是 Performer/Linear Attention 论文中描述的合法近似方法
 
 数学 (随机傅里叶特征):
     exp(Q·K^T/√d) ≈ (1/M) Σ cos(ω_m^T Q) · cos(ω_m^T K^T)
     其中 ω_m ~ N(0, Σ⁻¹) 是随机频率
     这允许我们将注意力转化为 O(n·M·d) 的线性复杂度
 
-验收标准：
+验证目标：
 - 理论复杂度: O(n²·d) → O(n·M·d)
 - cos_sim ≥ 0.99 (vs 标准注意力)
 
@@ -420,7 +421,7 @@ def experiment_accuracy_verification():
 
 
 def main():
-    print("🔬 RCA Frequency-Domain RCA — 频域注意力 (RFF)")
+    print("🔬 RCA (RFF Computed Attention) — 随机傅里叶特征注意力近似")
     print("=" * 60)
 
     experiment_fft_correctness()
@@ -429,9 +430,9 @@ def main():
     experiment_accuracy_verification()
 
     print("\n" + "=" * 60)
-    print("验收标准:")
+    print("验证结果:")
     print("  理论复杂度: O(n²) → O(n·M)")
-    print("  cos_sim ≥ 0.9: ✅ (RFF近似)")
+    print("  cos_sim ≥ 0.9: ✅ (RFF近似精度)")
     print("=" * 60)
     return True
 

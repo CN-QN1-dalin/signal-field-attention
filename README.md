@@ -188,20 +188,23 @@ python3 taicu_7b_ppl_verify.py
 - **Tests**: Write/read performance, memory constancy
 - **Key metric**: O(1) memory regardless of sequence length
 
-### 6. RCA Frequency-Domain Attention
-- **Purpose**: Random Fourier Feature approximation
+### 6. RCA (RFF Computed Attention)
+- **Purpose**: Random Fourier Feature approximation for attention
 - **Tests**: FFT reconstruction error, RFF attention accuracy
 - **Key metric**: O(n·M·d) complexity with minimal error
+- **Note**: Uses RFF (Performer-style), not true frequency-domain attention. FFT used only for spectral analysis validation.
 
 ### 7. Metal GPU Kernel
 - **Purpose**: Direct Metal shader GPU acceleration
 - **Tests**: Custom kernels for dequantization and attention fusion
-- **Key metric**: ~25× theoretical GPU speedup
+- **Key metric**: ~4.6× theoretical GPU speedup (simulator, not yet compiled)
+- **⚠️ Note**: Metal shaders written but not yet compiled (requires Xcode). Performance data is theoretical estimation.
 
 ### 8. Ultra Deployment
 - **Purpose**: Ultra-efficient model deployment
 - **Tests**: Layer-wise loading, INT4 quantization, swap optimization
-- **Key metric**: 75B model on 16GB with minimal swap
+- **Key metric**: 75B model on 16GB with minimal swap (simulated)
+- **⚠️ Note**: Python simulator. Forward pass uses noise perturbation, not real model inference.
 
 ## Implementation Details
 

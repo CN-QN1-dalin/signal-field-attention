@@ -9,11 +9,16 @@ Ultra Deployment Ultra — 通用模型部署
 - 懒加载+GC：并发翻2-3倍
 - 内存需求 = 单层大小 + KV Cache (与模型总大小无关)
 
-验收标准：
-- 75B 16GB仅200MB swap
-- 推理速度 3 tok/s
-- 内存占用 7.9GB
+⚠️ 模拟器说明：
+- 当前实现为 Python 模拟器，用于验证算法正确性和理论性能估算
+- forward() 使用噪声扰动模拟推理行为，非真实模型推理
+- 所有性能数据为理论估算值，非实测
+- 实际部署性能可能有所不同
 
+理论目标（待真实部署验证）：
+- 75B 16GB swap < 200MB（理论估算）
+- 推理速度 ~3 tok/s（理论估算）
+- 内存占用 ~7.9GB（理论估算）
 
 版本: v1.0.0
 """
@@ -168,6 +173,7 @@ class UltraInferenceEngine:
             layer = self.loader.load_layer(layer_id)
             d = len(hidden)
             w_sum = sum(layer["weights"]) / len(layer["weights"])
+            # ⚠️ 模拟器：非真实推理，用噪声扰动模拟前向传播
             hidden = [h * (1 + w_sum * 0.0001) + random.gauss(0, 0.001)
                       for h in hidden]
             self.loader.load_layer(-1)  # 释放
@@ -324,10 +330,10 @@ def main():
     experiment_lazyl_loading()
 
     print("\n" + "=" * 60)
-    print("验收标准:")
-    print("  75B 16GB swap <200MB: ✅")
-    print("  推理速度 3 tok/s: ✅")
-    print("  内存占用 7.9GB: ✅")
+    print("理论目标 (待真实部署验证):")
+    print("  75B 16GB swap <200MB (理论估算)")
+    print("  推理速度 ~3 tok/s (理论估算)")
+    print("  内存占用 ~7.9GB (理论估算)")
     print("=" * 60)
     return True
 

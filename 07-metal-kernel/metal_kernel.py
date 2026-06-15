@@ -8,10 +8,15 @@ Metal GPU Kernel Metal — 直接GPU内核
 - Attention kernel: 多步attention融合为一个GPU kernel
 - 内存布局优化: 直接控制GPU内存分配
 
-验收标准：
-- GPU加速 4.6x
-- 多步Attention 3.28x
+⚠️ 模拟器说明：
+- 当前实现为 Python 模拟器，用于验证算法正确性和理论性能估算
+- Metal shader 代码已编写但尚未编译（需要 Xcode/Metal 编译器）
+- 所有性能数据为理论估算值，非实测
+- 实际 Metal kernel 编译后性能可能有所不同
 
+理论目标（待 Metal 编译验证）：
+- GPU加速 ~4.6x（理论估算）
+- 多步Attention ~3.28x（理论估算）
 
 版本: v1.0.0
 """
@@ -329,10 +334,10 @@ def experiment_performance_summary():
     print(f"    - 核心数: {simulator.gpu_cores}")
     print(f"    CPU规格: 100 GFLOPS")
     print()
-    print("  预期加速:")
-    print("    - 整体: 4.6x (GPU vs CPU)")
-    print("    - 多步Attention: 3.28x")
-    print("    - 解量化: 10-50x")
+    print("  理论预期加速 (模拟器估算，非实测):")
+    print("    - 整体: ~4.6x (GPU vs CPU，待 Metal 编译验证)")
+    print("    - 多步Attention: ~3.28x (待 Metal 编译验证)")
+    print("    - 解量化: ~10-50x (理论估算)")
 
 
 def main():
@@ -346,8 +351,9 @@ def main():
     experiment_performance_summary()
 
     print("\n" + "=" * 60)
-    print("验收标准: GPU加速 4.6x, 多步Attention 3.28x")
-    print("注意: Python模拟，实际Metal kernel需要Metal编译器")
+    print("理论目标 (待 Metal 编译验证):")
+    print("  GPU加速 ~4.6x, 多步Attention ~3.28x")
+    print("  当前为 Python 模拟器，实际性能需要 Metal 编译器验证")
     print("=" * 60)
     return True
 
