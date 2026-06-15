@@ -15,11 +15,11 @@ The two channels are fused with a learnable mixing coefficient, preserving exact
 
 | Metric | Standard Attention | Signal Field | Improvement |
 |--------|-------------------|-------------|-------------|
-| Decoding speed (7B) | 1× | 4.16× | 4× faster |
-| KV cache (64K seq) | 2.1 GB | 8.6 MB | 248× compression |
+| Decoding speed (7B) | 1× | ~4.16× (theoretical) | Target for C++/Metal deployment |
+| KV cache (64K seq) | 2.1 GB | 8.6 MB | ~248× compression (theoretical) |
 | Additional parameters | 0 | ~8 KB | Negligible |
-| PPL (0.5B, shallow) | 22.375 | 23.062 | +3.07% |
-| PPL (0.5B, deep) | 22.375 | 20.011 | −10.57% |
+| PPL (0.5B, shallow) | 22.375 | 23.062 | +3.07% (simulator) |
+| PPL (0.5B, deep) | 22.375 | 20.011 | −10.57% (simulator) |
 
 ## 📢 推广
 
@@ -252,6 +252,10 @@ We build upon the shoulders of giants:
 
 ## Disclaimer
 
-This code is provided for research and educational purposes. The experiments described use synthetic data and benchmark models. Results may vary with different datasets, model architectures, and hardware configurations.
+This code is provided for research and educational purposes. **All experiments use synthetic data and simulator prototypes.** Performance metrics (speedup, memory compression) are theoretical estimates, not empirical measurements. Results may vary significantly with different datasets, model architectures, and hardware configurations.
+
+The MLX prototype in `src/` is slower than standard attention due to Python/MLX interpreter overhead. Speedup claims target C++/Metal deployment, which requires Xcode for compilation.
+
+Real model validation on WikiText-2 with a 100M-parameter model is planned as future work.
 
 Signal Field Attention is designed to work alongside existing Transformer architectures — it is a drop-in replacement for attention layers, not a complete model architecture replacement.

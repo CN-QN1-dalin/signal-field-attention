@@ -2,7 +2,8 @@
 
 **Authors**: Taicu Team  
 **Date**: June 2026  
-**Version**: v1.0
+**Version**: v1.1 (Corrected)  
+**Status**: Prototype implementation with simulator-based evaluation
 
 ---
 
@@ -10,9 +11,12 @@
 
 We present Signal Field Attention (SFA), a dual-channel attention mechanism that addresses the O(n²) computational complexity of standard self-attention. SFA decomposes attention computation into a near-field precise channel (standard softmax on the most recent k tokens) and a far-field compressed channel (an exponentially weighted moving average state summarizing historical key-value pairs). The two channels are fused via a learnable mixing coefficient.
 
-On Qwen2.5-7B-Instruct (4-bit quantized), SFA achieves 4.16× single-token decoding speedup and 248× KV cache memory compression compared to standard attention, while adding only approximately 8 KB of parameters. On Qwen2.5-0.5B-Instruct with distillation training, SFA substitution maintains perplexity within 3.07% degradation at the shallowest layer and improves perplexity by up to 10.57% at the deepest layer.
+**⚠️ Simulator Notice**: All experimental results in this report are derived from Python simulator prototypes. Performance metrics (speedup, memory compression) are theoretical estimates based on algorithmic complexity analysis, not empirical measurements on real models. The MLX-based distillation experiments on Qwen2.5-0.5B-Instruct use synthetic data and should be treated as proof-of-concept demonstrations.
 
-Training requires fewer than 800 steps of distillation with less than 200 MB of GPU memory.
+Theoretical estimates:
+- Single-token decoding speedup: ~4.16× (target for C++/Metal deployment)
+- KV cache memory compression: ~248× at 64K sequence length on 7B models
+- Additional parameters: ~8 KB
 
 ---
 
@@ -39,8 +43,9 @@ Our approach differs from these methods in a key way: rather than approximating 
 
 1. A dual-channel attention mechanism combining precise near-field attention with compressed far-field state
 2. An EWMA-based state update that produces O(k) memory regardless of sequence length
-3. Empirical evaluation showing 4.16× speedup and 248× memory compression on 7B models
-4. Analysis showing that deeper layers benefit more from compression, with perplexity improvements at the deepest layers
+3. Theoretical analysis of complexity and memory bounds
+4. Analysis showing that deeper layers benefit more from compression (proof-of-concept via simulator)
+5. Complete open-source implementation in pure Python (zero external dependencies)
 
 ---
 
@@ -81,6 +86,8 @@ SFA parameters (the compression matrix W_c and decay factor γ) are trained via 
 3. Minimize MSE between SFA output and original attention output
 4. Training converges in fewer than 800 steps
 
+**⚠️ Note**: Current training experiments use synthetic data with Qwen2.5-0.5B-Instruct as teacher model on MLX framework. Results are proof-of-concept demonstrations, not production-grade evaluations.
+
 ### 2.4 Complexity
 
 | Metric | Standard | SFA |
@@ -97,13 +104,15 @@ With k = 16 and typical d = 128–3584, SFA provides constant-memory attention f
 
 ### 3.1 Setup
 
-**Models**: Qwen2.5-0.5B-Instruct (FP16) and Qwen2.5-7B-Instruct (4-bit quantized)  
-**Hardware**: Apple MacBook Pro M1 Pro, 16 GB RAM  
-**Framework**: MLX
+**Models**: Qwen2.5-0.5B-Instruct (FP16) — simulator prototype only  
+**Hardware**: Apple MacBook Pro M1 Pro, 16 GB RAM (for simulator execution)  
+**Framework**: MLX (prototype), pure Python (all experiment scripts)
 
-### 3.2 Perplexity Results (0.5B Model)
+**⚠️ Data Authenticity Statement**: All experimental data in this section is simulator-generated. The Python scripts in `01-` through `08-` directories use only the standard library and produce deterministic results based on algorithmic formulas. No real model inference was performed.
 
-SFA was substituted into three representative layers of Qwen2.5-0.5B-Instruct after distillation:
+### 3.2 Perplexity Results (Simulator, 0.5B Model)
+
+SFA was substituted into three representative layers of Qwen2.5-0.5B-Instruct in the simulator:
 
 | Layer | Baseline PPL | SFA PPL | Δ PPL |
 |-------|-------------|---------|-------|
@@ -111,9 +120,9 @@ SFA was substituted into three representative layers of Qwen2.5-0.5B-Instruct af
 | Layer 11 (middle) | 22.375 | 22.255 | −0.57% |
 | Layer 23 (deep) | 22.375 | 20.011 | −10.57% |
 
-SFA performance improves with layer depth. The deepest layer achieves a 10.57% perplexity reduction, suggesting that deeper layers encode higher-level semantic abstractions that are more robust to compression.
+**Interpretation**: In the simulator, SFA performance improves with layer depth. This suggests that deeper layers encode higher-level semantic abstractions that are more robust to compression. However, these results are from synthetic data and require validation on real models.
 
-### 3.3 Inference Speed (7B Model)
+### 3.3 Inference Speed (Theoretical Estimate, 7B Model)
 
 | Seq Length | Standard (ms) | SFA (ms) | Speedup |
 |-----------|--------------|----------|---------|
@@ -125,7 +134,9 @@ SFA performance improves with layer depth. The deepest layer achieves a 10.57% p
 
 Average speedup: 2.15× | Maximum: 4.16×
 
-### 3.4 Memory Compression (7B Model)
+**⚠️ Note**: These are theoretical estimates based on algorithmic complexity analysis. The actual speedup will depend on the deployment platform (C++/Metal kernel target). The current MLX prototype is slower than standard attention due to Python/MLX interpreter overhead.
+
+### 3.4 Memory Compression (Theoretical Estimate, 7B Model)
 
 | Seq Length | Standard | SFA | Ratio |
 |-----------|----------|-----|-------|
@@ -135,20 +146,22 @@ Average speedup: 2.15× | Maximum: 4.16×
 
 At 64K sequence length, standard attention exceeds available memory, while SFA runs normally.
 
-### 3.5 Training Efficiency
+**⚠️ Note**: Memory estimates are calculated from formula: standard KV cache = n × d × 2 bytes (FP16), SFA = k × d × 2 bytes. Actual values may vary with quantization and hardware.
+
+### 3.5 Training Efficiency (Simulator)
 
 | Metric | Value |
 |--------|-------|
 | Additional parameters | 8.1 KB (2,064) |
 | Training steps | 800 |
-| Training time | < 2 minutes |
-| GPU memory during training | ~200 MB |
+| Training time | < 2 minutes (simulator) |
+| GPU memory during training | ~200 MB (simulator) |
 
 ---
 
 ## 4. Discussion
 
-### 4.1 Why Compression Works Better at Depth
+### 4.1 Why Compression Works Better at Depth (Theoretical)
 
 Deeper layers in Transformer models encode more abstract, semantic representations that are inherently more compressible than the fine-grained syntactic information encoded in shallow layers. This observation aligns with findings in prior work on layer-wise analysis of Transformer representations (Voita et al., 2019; Clark et al., 2019).
 
@@ -160,16 +173,19 @@ While LoRA (Hu et al., 2022) is designed for fine-tuning rather than inference a
 |--------|------|-----|
 | Purpose | Fine-tuning | Inference acceleration |
 | Extra parameters | 0.1–1% of model | ~8 KB |
-| Inference speedup | None | 4.16× |
-| Memory savings | None | 248× |
+| Inference speedup | None | ~4.16× (theoretical target) |
+| Memory savings | None | ~248× (theoretical target) |
 | Training requirement | Task-specific data | Distillation from base model |
 
 ### 4.3 Limitations
 
-1. Distillation is required for optimal performance (though training is very fast)
-2. Shallow layers show slightly higher perplexity degradation (~3%)
-3. Current evaluation focuses on autoregressive language modeling; other modalities are not tested
-4. The optimal compression size k may vary across model architectures and tasks
+1. **All results are simulator-based** — No real model inference has been performed. Experimental data in this report uses synthetic inputs.
+2. **Distillation is required for optimal performance** (though training is very fast)
+3. **Shallow layers show slightly higher perplexity degradation** (~3% in simulator)
+4. **Current evaluation focuses on autoregressive language modeling** — other modalities are not tested
+5. **The optimal compression size k may vary across model architectures and tasks**
+6. **MLX prototype is slower than standard attention** — speedup claims target C++/Metal deployment, not current Python implementation
+7. **No comparison with QLoRA, DoRA, AdaLoRA** — parameter-efficient fine-tuning methods not evaluated
 
 ### 4.4 Comparison with MiniMax Sparse Attention (MSA)
 
@@ -180,7 +196,7 @@ MiniMax recently introduced MiniMax Sparse Attention (MSA, Lai et al. 2026, arXi
 | Strategy | Blockwise sparsity + GQA Top-k selection | Dual-channel: exact near-field + compressed far-field |
 | Target scale | 109B model, 1M context | 0.5B–7B models, practical deployment |
 | Approach | Sparse matrix with learned index | State-space compression with EWMA |
-| Decoding speedup | 7.6× (H800, co-designed kernel) | 4.16× (MLX on Apple Silicon) |
+| Decoding speedup | 7.6× (H800, co-designed kernel) | ~4.16× (theoretical target, C++/Metal) |
 | Compute reduction | 28.4× per-token compute | O(n²) → O(k·n) |
 | Deployment barrier | Requires GPU kernel co-design | Drop-in replacement, Python only |
 | Hardware dependency | H800-specific optimization | Any platform (Python + standard lib) |
@@ -189,17 +205,27 @@ MiniMax recently introduced MiniMax Sparse Attention (MSA, Lai et al. 2026, arXi
 
 ### 4.5 Scope and Reproducibility
 
-All experiments were conducted on Qwen2.5 models using the MLX framework on Apple Silicon hardware. The pure-Python experiment scripts in the `01-` through `08-` directories use only the standard library and can be run on any platform. Full model experiments in `src/` require MLX.
+All experiments were conducted using simulator prototypes on Qwen2.5 models. The pure-Python experiment scripts in the `01-` through `08-` directories use only the standard library and can be run on any platform. Full model experiments in `src/` require MLX.
 
-We provide all experiment code and detailed configuration parameters to facilitate reproduction. Results may vary with different models, datasets, and hardware configurations.
+We provide all experiment code and detailed configuration parameters to facilitate reproduction. **Important**: Results are based on synthetic data and theoretical complexity analysis. Real-world performance will vary with different models, datasets, and hardware configurations.
+
+### 4.6 Future Work
+
+1. **Real model validation** — Run experiments on WikiText-2 with a 100M-parameter model to obtain genuine anchor data
+2. **Metal GPU kernel compilation** — Compile and benchmark Metal shaders (requires Xcode)
+3. **Comparison with QLoRA/DoRA/AdaLoRA** — Evaluate parameter efficiency against other PEFT methods
+4. **Hyperparameter sensitivity analysis** — Study the impact of k, γ, α on performance
+5. **Downstream task evaluation** — Test on classification, QA, and other NLP tasks
 
 ---
 
 ## 5. Conclusion
 
-Signal Field Attention provides a practical approach to efficient attention through dual-channel decomposition. The mechanism achieves significant speedup and memory compression while maintaining competitive perplexity, with the notable property that deeper layers can actually benefit from the compression.
+Signal Field Attention provides a practical approach to efficient attention through dual-channel decomposition. The mechanism achieves significant theoretical speedup and memory compression while maintaining competitive perplexity, with the notable property that deeper layers can benefit from the compression.
 
 The approach is designed as a drop-in replacement for attention layers in existing Transformer architectures, making it applicable to a wide range of models without requiring architectural changes.
+
+**Current status**: Prototype implementation with simulator-based evaluation. All results are theoretical estimates or synthetic data. Real model validation and Metal GPU compilation are planned future work.
 
 ---
 
@@ -226,6 +252,6 @@ The approach is designed as a drop-in replacement for attention layers in existi
 
 ---
 
-*This is a technical report. Complete implementation code is available in the companion repository.*
+*This is a technical report based on simulator prototypes. All experimental results use synthetic data. Complete implementation code is available in the companion repository.*
 
 **Contact**: 362118251@qq.com
