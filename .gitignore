@@ -44,12 +44,3 @@ env/
 /tmp/*.md
 /tmp/*.png
 /tmp/*.jpg
-
-# Environment
-.env
-
-# Logs
-*.log
-
-# Backup
-*.bak
