@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "skills": {
+    "xiaping-review-template": {
+      "name": "虾评评测模板",
+      "zip_url": "https://api.skillhub.cn/api/v1/download?slug=xiaping-review-template",
+      "source": "community",
+      "version": "1.0.0",
+      "installedAt": "2026-06-15T08:27:25Z"
+    }
+  }
+}
