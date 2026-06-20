@@ -1,0 +1,10 @@
+[package]
+name = "dalin-soma"
+version = "0.1.0"
+edition = "2021"
+description = "Dalin Soma: Signal Field Attention inference acceleration framework"
+license = "MIT"
+
+[dependencies]
+
+[dev-dependencies]
