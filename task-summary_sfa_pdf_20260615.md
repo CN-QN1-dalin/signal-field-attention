@@ -30,7 +30,7 @@ Generate a corrected PDF version of the SFA (Signal Field Attention) technical p
 ### Files Generated
 - `/tmp/soma_sfa_paper.pdf` — 6-page corrected SFA paper PDF
 - `/tmp/soma_sfa_paper.tex` — LaTeX source (for future pdflatex compilation when available)
-- Copied to: `/Users/apple/Desktop/太初五岳开源/SFA_Technical_Paper.pdf` and `.tex`
+- Copied to: `/Users/apple/Desktop/QN1幻化引擎开源/SFA_Technical_Paper.pdf` and `.tex`
 
 ### Key Corrections in PDF
 1. **Removed**: Fabricated PPL comparison table with Mamba (incompatible architecture category)

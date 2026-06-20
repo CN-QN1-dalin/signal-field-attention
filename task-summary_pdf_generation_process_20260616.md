@@ -1,7 +1,7 @@
 # PDF 生成过程总结
 
 ## 目标
-将太初五岳(Dalin Soma)项目的5篇学术论文（Soma Engine、Soma Native、Soma Convergence、Soma LingYa、Soma Heritage）生成英文PDF格式。
+将QN1幻化引擎(Dalin Soma)项目的5篇学术论文（Soma Engine、Soma Native、Soma Convergence、Soma LingYa、Soma Heritage）生成英文PDF格式。
 
 ## 遇到的问题
 
