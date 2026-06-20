@@ -710,7 +710,7 @@ def run_all_experiments(output_dir: str = ".") -> Dict:
 
 
 if __name__ == "__main__":
-    results = run_all_experiments("/Users/apple/Desktop/太初五岳开源")
+    results = run_all_experiments("/Users/apple/Desktop/QN1幻化引擎开源")
     
     print("\n\nSummary of all experiments:")
     print(json.dumps({

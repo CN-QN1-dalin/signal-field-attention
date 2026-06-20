@@ -95,7 +95,7 @@ If this work contributes to your research, please cite:
 
 ```bibtex
 @misc{signal_field_attention_2026,
-  author = {Taicu Team},
+  author = {QN1幻化引擎团队},
   title = {Signal Field Attention: Learning to Compress Attention for Efficient Inference},
   year = {2026},
   note = {Technical Report v1.0},

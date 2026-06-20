@@ -27,7 +27,7 @@
 **阶段三：13:39 - 14:07 — 最终打磨与生成**
 - **问题 5**：Notes/Disclaimers 仍然泄漏到 Abstract 部分。
 - **修复**：修正脚本第 212 行，遇到非 Abstract blockquote 时停止追加到 `abstract_text`。
-- **结果**：成功生成 6 个 PDF 文件至 `/Users/apple/Desktop/太初五岳开源/`：
+- **结果**：成功生成 6 个 PDF 文件至 `/Users/apple/Desktop/QN1幻化引擎开源/`：
   1. `Soma_Engine.pdf`
   2. `Soma_LingYa.pdf`
   3. `Soma_Native.pdf`

@@ -70,4 +70,4 @@ Or use overleaf.com for online compilation.
 
 ## Disclaimer
 
-This work is preliminary research by an independent researcher. Some results are simulated or theoretical. Claims should be interpreted as research hypotheses pending further validation. The code repository is available at: https://github.com/CN-QN1-dalin/dalin-soma-
+This work is preliminary research by an independent researcher. Some results are simulated or theoretical. Claims should be interpreted as research hypotheses pending further validation. The code repository is available at: https://github.com/CN-QN1-dalin/signal-field-attention

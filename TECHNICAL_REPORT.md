@@ -1,6 +1,6 @@
 # Signal Field Attention: Learning to Compress Attention for Efficient Inference
 
-**Authors**: Taicu Team  
+**Authors**: QN1幻化引擎团队  
 **Date**: June 2026  
 **Version**: v1.1 (Corrected)  
 **Status**: Prototype implementation with simulator-based evaluation
