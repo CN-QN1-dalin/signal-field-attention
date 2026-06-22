@@ -29,3 +29,55 @@ Thumbs.db
 *.tmp
 *.swp
 *.bak
+
+# === Dalin Soma 清理规则 ===
+# PDF 文件（文档归档在 archive/）
+*.pdf
+
+# 论文草稿和审查报告
+*_EN.md
+Dalin_Soma_Academic_Paper_CN.md
+Dalin_Soma_Chinese_Academic_Paper.md
+Dalin_Soma_Five_Papers_Combined.md
+Dalin_Soma_Five_Papers_EN.md
+SFA_*_integration_plan*.md
+SFA_*_review*.md
+SFA_UNIQ_ANALYSIS.md
+LaTeX*.md
+
+# Task summaries
+task-summary_*.md
+任务总结_*.md
+
+# Phi monitoring
+Phi_trend_history.md
+
+# Benchmark data
+benchmark_results.json
+extended_experiment_results.json
+
+# Publishing drafts
+掘金文章_*.md
+测试数据汇总*.md
+顶会*.md
+
+# Legacy Soma directories (moved to archive/)
+01_soma_engine/
+02_soma_lingya/
+03_soma_native/
+04_soma_convergence/
+05_soma_heritage/
+06_soma_v7_demo/
+
+# Archive directory
+archive/
+
+# Build artifacts
+target/
+*.egg-info/
+__pycache__/
+*.pyc
+
+# Other
+*.zip
+*.tex
