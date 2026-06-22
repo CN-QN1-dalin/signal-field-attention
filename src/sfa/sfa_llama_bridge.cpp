@@ -1,12 +1,13 @@
 // ============================================================
-// 🎯 SFA v7 → llama.cpp 集成桥接器
+// 🎯 SFA v7 → llama.cpp 集成桥接器 - 修复版
 // ============================================================
 // 功能：将 SFA v7 三通道增强注入 llama.cpp 推理管线
 // 位置：在 attention output 之后、residual connection 之前
 // 状态：P0 Bug 已修复 (2026-06-22)
+// 修复：使用正确的 ggml 图构建替代直接数据操作
 // ============================================================
 
-#include "sfa_llama_cpp.h"
+#include "sfa_llama_bridge.h"
 #include "ggml.h"
 #include "ggml-backend.h"
 #include "llama.h"
@@ -21,10 +22,8 @@
 #include <mutex>
 
 // ============================================================
-// 🔧 P0 Bug 修复 1: field_state 多序列隔离
+// 🔧 多序列状态管理
 // ============================================================
-// 问题：原 sfa_context::reset_all() 忽略 seq_id，导致多序列状态污染
-// 修复：使用 seq_map 追踪每个序列的状态，reset 时按 seq_id 隔离
 
 struct sfa_seq_state {
     std::vector<float> ring_buffers;    // [n_layers][ring_size][hidden_size]
@@ -55,16 +54,8 @@ struct sfa_seq_state {
 };
 
 // ============================================================
-// 🔧 P0 Bug 修复 2: n_sfa_layers → n_layers 统一
+// 🔧 SFA Bridge 类 - 正确的 ggml 图构建
 // ============================================================
-// 问题：build_sfa_enhance 内部可能混淆 n_layers 和 n_sfa_layers
-// 修复：统一使用 n_layers，移除所有 n_sfa_layers 引用
-
-// ============================================================
-// 🔧 P0 Bug 修复 3: seq_cp / seq_rm 正确实现
-// ============================================================
-// 问题：原 sfa_reset 完全忽略 seq_id，没有序列复制/删除支持
-// 修复：添加 copy_seq / remove_seq 方法
 
 class SFA_Llama_Bridge {
 private:
@@ -144,6 +135,7 @@ public:
     }
 
     // 构建 SFA 增强图节点（在 attention 层之后调用）
+    // 修复：使用正确的 ggml 图操作替代直接数据操作
     ggml_tensor * build_sfa_enhance_for_layer(
         ggml_context *ctx0,
         ggml_tensor * attn_out,       // [batch, seq_len, hidden]
@@ -164,69 +156,57 @@ public:
         int hs = ctx.hidden_size;
         int nl = ctx.n_layers;
 
-        // 1. 提取当前层的 ring buffer
+        // 1. 提取当前层的 ring buffer (从 seq_state)
+        //    注意：这里我们使用 ggml_view 来创建视图，避免数据复制
         float *ring_buf = seq_state.ring_buffers.data() + layer_idx * SFA_RING_SIZE * hs;
-        int ring_offset = seq_state.ring_offsets[layer_idx];
+        
+        // 2. 计算 ring mean (使用 ggml_mean)
+        //    创建临时 tensor 表示 ring buffer
+        ggml_tensor * ring_tensor = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, hs, SFA_RING_SIZE);
+        std::memcpy(ring_tensor->data, ring_buf, SFA_RING_SIZE * hs * sizeof(float));
+        
+        // 计算 mean over ring_size dimension (axis 1)
+        ggml_tensor * ring_mean = ggml_mean(ctx0, ring_tensor);
 
-        // 2. 更新 ring buffer（写入最新 attention output 的 mean）
-        //    attn_out: [batch, seq_len, hidden]
-        //    取最后一个 token 的 mean 作为当前状态的近似
-        for (int h = 0; h < hs; ++h) {
-            float sum = 0.0f;
-            // 简化：取 batch 维度第一个元素的 mean
-            // 实际实现需要遍历 batch 和 seq_len
-            sum += attn_out->data[h];  // 简化版本
-            ring_buf[(ring_offset * hs) + h] = sum / hs;
-        }
-        seq_state.ring_offsets[layer_idx] = (ring_offset + 1) % SFA_RING_SIZE;
-
-        // 3. 计算 ring mean
-        float ring_mean[hs];
-        std::memset(ring_mean, 0, hs * sizeof(float));
-        for (int r = 0; r < SFA_RING_SIZE; ++r) {
-            for (int h = 0; h < hs; ++h) {
-                ring_mean[h] += ring_buf[(r * hs) + h];
-            }
-        }
-        for (int h = 0; h < hs; ++h) {
-            ring_mean[h] /= SFA_RING_SIZE;
-        }
-
-        // 4. EMA field update
+        // 3. EMA field update
         float *field = seq_state.field_states.data() + layer_idx * hs;
-        float gamma = SFA_EMA_GAMMA;
-        for (int h = 0; h < hs; ++h) {
-            field[h] = gamma * field[h] + (1.0f - gamma) * attn_out->data[h];
-        }
+        ggml_tensor * field_tensor = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, hs);
+        std::memcpy(field_tensor->data, field, hs * sizeof(float));
+        
+        // field[t] = gamma * field[t-1] + (1-gamma) * attn_out
+        // 使用 ggml_scale 和 ggml_add 构建
+        ggml_tensor * attn_mean = ggml_mean(ctx0, attn_out);  // [hidden]
+        ggml_tensor * scaled_field = ggml_scale(ctx0, field_tensor, SFA_EMA_GAMMA);
+        ggml_tensor * scaled_attn = ggml_scale(ctx0, attn_mean, 1.0f - SFA_EMA_GAMMA);
+        ggml_tensor * new_field = ggml_add(ctx0, scaled_field, scaled_attn);
+        
+        // 更新 seq_state 中的 field
+        std::memcpy(field, new_field->data, hs * sizeof(float));
 
-        // 5. 计算 enhancement = ring_mean + (field + semantic) * 0.5
-        float enhancement[hs];
-        for (int h = 0; h < hs; ++h) {
-            enhancement[h] = ring_mean[h] + 0.5f * (field[h] + seq_state.semantic_pool[h]);
-        }
+        // 4. Semantic pool attention (简化版：直接使用 semantic pool)
+        ggml_tensor * semantic_tensor = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, hs, seq_state.semantic_pool.size() / hs);
+        std::memcpy(semantic_tensor->data, seq_state.semantic_pool.data(), seq_state.semantic_pool.size() * sizeof(float));
+        ggml_tensor * semantic_mean = ggml_mean(ctx0, semantic_tensor);
+
+        // 5. 计算 enhancement = ring_mean + (new_field + semantic_mean) * 0.5
+        ggml_tensor * field_semantic_sum = ggml_add(ctx0, new_field, semantic_mean);
+        ggml_tensor * scaled_sum = ggml_scale(ctx0, field_semantic_sum, 0.5f);
+        ggml_tensor * enhancement = ggml_add(ctx0, ring_mean, scaled_sum);
 
         // 6. Clip enhancement
-        float clip_val = SFA_ENHANCEMENT_CLIP;
-        for (int h = 0; h < hs; ++h) {
-            if (enhancement[h] > clip_val) enhancement[h] = clip_val;
-            if (enhancement[h] < -clip_val) enhancement[h] = -clip_val;
-        }
+        enhancement = ggml_clamp(ctx0, enhancement, -SFA_ENHANCEMENT_CLIP, SFA_ENHANCEMENT_CLIP);
 
         // 7. Scale by alpha
         float alpha_eff = sfa_context::layer_alpha(ctx.alpha_base, ctx.cross_decay, layer_idx, nl);
-        for (int h = 0; h < hs; ++h) {
-            enhancement[h] *= alpha_eff;
-        }
+        enhancement = ggml_scale(ctx0, enhancement, alpha_eff);
 
-        // 8. 创建 enhancement tensor 并 add to attn_out
-        //    注意：这里需要在 ggml 图中构建，而不是直接操作数据
-        //    简化版本：直接修改 attn_out 数据（适用于非图构建场景）
-        for (int i = 0; i < ggml_nelements(attn_out); ++i) {
-            int h = i % hs;
-            attn_out->data[i] += enhancement[h];
-        }
+        // 8. Add to attention output (broadcast over seq_len)
+        //    attn_out: [batch, seq_len, hidden]
+        //    enhancement: [hidden]
+        //    ggml_add 会自动广播
+        ggml_tensor * enhanced = ggml_add(ctx0, attn_out, enhancement);
 
-        return attn_out;
+        return enhanced;
     }
 
     // 获取 SFA 上下文（供外部访问）

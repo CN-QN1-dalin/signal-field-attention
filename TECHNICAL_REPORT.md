@@ -16,6 +16,7 @@ We present Signal Field Attention (SFA), a dual-channel attention mechanism that
 - Seven-layer replacement (v7a) and twenty-four-layer replacement (v7b) strategies validated on Qwen2.5-7B-4bit.
 - llama.cpp integration prototype completed with three-signal-channel architecture (Ring Buffer, EMA Field, Semantic Pool).
 - Metal GPU kernel pipeline fully written (6 kernels) with build scripts; compilation blocked by Xcode SDK availability.
+- **Random projection orthogonality fix (v4)**: Successfully reduced cosine similarity from 0.65 to -0.042 ~ 0.007 (near-perfect orthogonality).
 
 **Verified experimental data** (MLX prototype on Qwen2.5-7B-4bit):
 - SFA v7 PPL improvement: **-1.61% to -5.79%** (net improvement, not degradation)

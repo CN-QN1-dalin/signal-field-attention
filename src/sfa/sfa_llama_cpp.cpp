@@ -45,14 +45,15 @@ static inline ggml_tensor * ring_buffer_mean(
     const ggml_cgraph *gf) {
 
     if (ring_count <= 0) {
-        // Return zero tensor
-        return ggml_zeros_in_place(ctx0, ring_buffer, GGML_TYPE_F32);
+        // Return zero tensor using ggml_fill
+        ggml_tensor * zero = ggml_dup_tensor(ctx0, ring_buffer);
+        return ggml_fill(ctx0, zero, 0.0f);
     }
 
-    // Sum all valid ring entries along axis 0
-    // ggml_sum_elements sums along the first dimension
-    ggml_tensor * sum = ggml_sum_elements(ctx0, ring_buffer);
-    return sum;
+    // Use ggml_mean to compute mean along rows (axis 0)
+    // ggml_mean computes mean along rows, returning [1, hidden_size]
+    ggml_tensor * mean = ggml_mean(ctx0, ring_buffer);
+    return mean;
 }
 
 // Helper: EMA update for field state
@@ -82,14 +83,19 @@ static inline ggml_tensor * semantic_pool_attention(
     float temperature,
     const ggml_cgraph *gf) {
 
-    // Compute dot products: query @ semantic_pool^T -> [slots]
+    // Compute dot products: semantic_pool @ query -> [slots]
+    // Note: ggml_mul_mat expects [K, M] @ [K, N] -> [M, N]
+    // So we need: semantic_pool [slots, hidden] @ query [hidden] -> [slots]
     ggml_tensor * dots = ggml_mul_mat(ctx0, semantic_pool, query);
 
     // Softmax over slots
     dots = ggml_soft_max_ext(ctx0, dots, nullptr, temperature, 1.0f);
 
     // Weighted sum: semantic_pool^T @ dots -> [hidden_size]
-    return ggml_mul_mat(ctx0, query, dots);
+    // semantic_pool^T is [hidden, slots], dots is [slots]
+    // Transpose semantic_pool first
+    ggml_tensor * semantic_T = ggml_transpose(ctx0, semantic_pool);
+    return ggml_mul_mat(ctx0, semantic_T, dots);
 }
 
 // Main SFA enhancement builder
