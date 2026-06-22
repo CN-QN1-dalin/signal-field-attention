@@ -1,0 +1,136 @@
+{
+  "correctness": {
+    "seq_16": {
+      "mean_error": 0.0089062201,
+      "max_error": 0.544784,
+      "similarity_all": 0.992407,
+      "similarity_skip_t0": 1.0
+    },
+    "seq_32": {
+      "mean_error": 0.0031045349,
+      "max_error": 0.318939,
+      "similarity_all": 0.996559,
+      "similarity_skip_t0": 1.0
+    },
+    "seq_64": {
+      "mean_error": 0.0011484456,
+      "max_error": 0.227271,
+      "similarity_all": 0.998468,
+      "similarity_skip_t0": 1.0
+    },
+    "seq_128": {
+      "mean_error": 0.000349648,
+      "max_error": 0.170036,
+      "similarity_all": 0.99946,
+      "similarity_skip_t0": 1.0
+    },
+    "seq_256": {
+      "mean_error": 0.0001362019,
+      "max_error": 0.116532,
+      "similarity_all": 0.999792,
+      "similarity_skip_t0": 1.0
+    },
+    "seq_512": {
+      "mean_error": 5.3288e-05,
+      "max_error": 0.09883,
+      "similarity_all": 0.999873,
+      "similarity_skip_t0": 1.0
+    },
+    "seq_1024": {
+      "mean_error": 1.83869e-05,
+      "max_error": 0.058407,
+      "similarity_all": 0.999956,
+      "similarity_skip_t0": 1.0
+    }
+  },
+  "speed": {
+    "seq_64": {
+      "std_prefill_ms": 2.33,
+      "soma_prefill_ms": 16.92,
+      "speedup": 0.14,
+      "decode_ms_token": 1.936
+    },
+    "seq_128": {
+      "std_prefill_ms": 3.25,
+      "soma_prefill_ms": 46.61,
+      "speedup": 0.07,
+      "decode_ms_token": 2.3993
+    },
+    "seq_256": {
+      "std_prefill_ms": 5.57,
+      "soma_prefill_ms": 74.39,
+      "speedup": 0.07,
+      "decode_ms_token": 2.3941
+    },
+    "seq_512": {
+      "std_prefill_ms": 11.67,
+      "soma_prefill_ms": 151.68,
+      "speedup": 0.08,
+      "decode_ms_token": 3.5352
+    },
+    "seq_1024": {
+      "std_prefill_ms": 29.27,
+      "soma_prefill_ms": 298.61,
+      "speedup": 0.1,
+      "decode_ms_token": 3.5869
+    },
+    "seq_2048": {
+      "std_prefill_ms": 79.15,
+      "soma_prefill_ms": 654.9,
+      "speedup": 0.12,
+      "decode_ms_token": 4.0172
+    },
+    "seq_4096": {
+      "std_prefill_ms": 284.04,
+      "soma_prefill_ms": 1352.28,
+      "speedup": 0.21,
+      "decode_ms_token": 6.8559
+    }
+  },
+  "memory": {
+    "len_128": {
+      "standard_kb": 896.0,
+      "soma_kb": 115.5,
+      "compression_ratio": 7.8
+    },
+    "len_512": {
+      "standard_kb": 3584.0,
+      "soma_kb": 115.5,
+      "compression_ratio": 31.0
+    },
+    "len_1024": {
+      "standard_kb": 7168.0,
+      "soma_kb": 115.5,
+      "compression_ratio": 62.1
+    },
+    "len_4096": {
+      "standard_kb": 28672.0,
+      "soma_kb": 115.5,
+      "compression_ratio": 248.2
+    },
+    "len_16384": {
+      "standard_kb": 114688.0,
+      "soma_kb": 115.5,
+      "compression_ratio": 993.0
+    },
+    "len_65536": {
+      "standard_kb": 458752.0,
+      "soma_kb": 115.5,
+      "compression_ratio": 3971.9
+    }
+  },
+  "ppl": {
+    "seq_64": {
+      "hf_ppl": 24.1558,
+      "tokens_tested": 630
+    },
+    "seq_256": {
+      "hf_ppl": 24.1558,
+      "tokens_tested": 630
+    },
+    "seq_1024": {
+      "hf_ppl": 24.1558,
+      "tokens_tested": 630
+    }
+  }
+}
