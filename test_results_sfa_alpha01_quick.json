@@ -1,0 +1,57 @@
+{
+  "model": "/Users/apple/models/Qwen2.5-0.5B-Instruct",
+  "alpha": 0.1,
+  "device": "cpu",
+  "n_layers": 24,
+  "hidden_size": 896,
+  "tests": {
+    "ppl_comparison": {
+      "7": {
+        "baseline_ppl": 21.4572,
+        "enhanced_ppl": 21.4452,
+        "improvement_pct": 0.06
+      },
+      "14": {
+        "baseline_ppl": 3.3354,
+        "enhanced_ppl": 3.335,
+        "improvement_pct": 0.01
+      },
+      "28": {
+        "baseline_ppl": 3.4902,
+        "enhanced_ppl": 3.4885,
+        "improvement_pct": 0.05
+      },
+      "57": {
+        "baseline_ppl": 2.095,
+        "enhanced_ppl": 2.0954,
+        "improvement_pct": -0.02
+      },
+      "114": {
+        "baseline_ppl": 1.516,
+        "enhanced_ppl": 1.5162,
+        "improvement_pct": -0.01
+      }
+    },
+    "orthogonality": {
+      "avg_cosine": 0.645265,
+      "samples": [
+        0.872786283493042,
+        0.6317582130432129,
+        0.6084809303283691,
+        0.7144773006439209,
+        0.6701689958572388,
+        0.7059370279312134,
+        0.6958490014076233,
+        0.6686379909515381,
+        0.6142860651016235,
+        0.6667424440383911
+      ]
+    },
+    "memory_mb": 1.39
+  },
+  "summary": {
+    "avg_ppl_improvement_pct": 0.02,
+    "memory_mb": 1.39,
+    "overall": "NEEDS_REVIEW"
+  }
+}
