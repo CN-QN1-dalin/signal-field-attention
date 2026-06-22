@@ -12,7 +12,7 @@ using namespace metal;
 constant constexpr int SFA_RING_SIZE = 16;
 constant constexpr int SFA_SEMANTIC_SLOTS = 64;
 constant constexpr float SFA_EMA_GAMMA = 0.98f;
-constant constexpr float SFA_ENHANCEMENT_CLIP = 0.01f;
+constant constexpr float SFA_ENHANCEMENT_CLIP = 0.5f;  // calibrated: avoid signal saturation
 
 // NEON 优化的向量加法 (Metal 等效)
 kernel void neon_vec_add(

@@ -18,8 +18,8 @@
 #define SFA_SEMANTIC_SLOTS 64
 #define SFA_EMA_GAMMA 0.98f
 #define SFA_GAUSS_GAMMA 0.951229f  // exp(-0.05)
-#define SFA_CROSS_DECAY_DEFAULT 0.7f
-#define SFA_ENHANCEMENT_CLIP 0.01f
+#define SFA_CROSS_DECAY_DEFAULT 0.8f  // calibrated: balanced layer contribution
+#define SFA_ENHANCEMENT_CLIP 0.5f     // increased from 0.01 to avoid signal saturation
 
 // ─── SFA State per layer ─────────────────────────────────────────
 
@@ -71,7 +71,7 @@ struct sfa_context {
     sfa_layer_state * layer_states;
 
     sfa_context()
-        : enabled(false), alpha_base(2.0f), cross_decay(SFA_CROSS_DECAY_DEFAULT),
+        : enabled(false), alpha_base(0.1f), cross_decay(SFA_CROSS_DECAY_DEFAULT),
           ring_size(SFA_RING_SIZE), n_layers(0), hidden_size(0),
           semantic_slots(SFA_SEMANTIC_SLOTS), layer_states(nullptr) {}
 
