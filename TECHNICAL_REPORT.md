@@ -370,3 +370,30 @@ Signal Field Attention provides a practical approach to efficient attention thro
 *This is a technical report based on a multi-version prototype ecosystem. Results are clearly labeled as verified (real-model inference on Qwen2.5-7B-4bit) or theoretical/simulator-based. Complete implementation code is available in the companion repository.*
 
 **Contact**: 362118251@qq.com
+
+---
+
+## Appendix: SFA v7 Random Projection Orthogonality Fix (v4)
+
+**Date**: 2026-06-22  
+**Issue**: Original SFA enhancement had cosine similarity ~0.65 with attention output, indicating redundancy rather than orthogonality.
+
+**Solution**: Implemented Gram-Schmidt orthogonalization with random projection:
+1. Subtract projection of enhancement along attention direction
+2. Mix 30% random subspace component for independence
+3. Fix enhancement norm to CLIP_NORM=0.5
+
+**Results**:
+| Metric | Before Fix | After Fix (v4) | Target |
+|--------|------------|----------------|--------|
+| Cosine Similarity | 0.65 | -0.042 ~ 0.007 | <0.1 |
+| Orthogonality | ❌ Failed | ✅ Passed | - |
+| PPL Impact | -0.02% ~ -2.17% | -0.02% ~ -2.17% | <0 |
+
+**Conclusion**: Orthogonality successfully achieved, but PPL still degrades slightly. Root cause: enhancement magnitude too small after alpha scaling, or orthogonal channel itself cannot improve PPL.
+
+**Next Steps**:
+1. Increase CLIP_NORM or remove alpha scaling
+2. Try injecting at attention weights instead of output
+3. Validate on larger models (14B/7B) with GPU
+
