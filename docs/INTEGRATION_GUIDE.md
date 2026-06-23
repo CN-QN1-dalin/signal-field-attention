@@ -48,8 +48,8 @@ Ctx Free                 Scale      Ring Mean
 SFA_RING_SIZE = 16
 SFA_SEMANTIC_SLOTS = 64
 SFA_EMA_GAMMA = 0.98
-SFA_ENHANCEMENT_CLIP = 0.01
-SFA_ALPHA_BASE = 0.04
+SFA_ENHANCEMENT_CLIP = 0.5
+SFA_ALPHA_BASE = 0.1
 ```
 
 ## Troubleshooting

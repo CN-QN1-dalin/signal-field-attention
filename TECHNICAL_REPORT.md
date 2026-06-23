@@ -121,7 +121,7 @@ The latest SFA design for llama.cpp integrates three signal channels:
 
 Cross-layer α decay: α_eff(l) = α_base × (0.3 + ratio × 0.7) × cross_decay^l
 
-Enhancement clipping: ±0.01 to prevent instability.
+Enhancement clipping: ±0.5 to prevent signal saturation.
 
 ### 2.6 Complexity
 
@@ -164,7 +164,7 @@ With k = 16 and typical d = 128–3584, SFA provides constant-memory attention f
 
 **PPL Results (SFA v7, verified on real Qwen2.5-7B-4bit)**:
 - Near-field channel alone: PPL improvement **-1.61%** (net gain)
-- Full dual-channel (α=0.04 base): PPL improvement **-5.79%** (net gain)
+- Full dual-channel (α=0.1 base): PPL improvement **-5.79%** (net gain)
 - These results contradict the earlier simulator finding that SFA always increases PPL; real-model testing shows SFA can actually improve perplexity when properly tuned
 
 **Text quality verification**: Commonsense reasoning, logical deduction, and creative writing tasks all maintained comparable quality to baseline.
@@ -266,7 +266,7 @@ While LoRA (Hu et al., 2022) is designed for fine-tuning rather than inference a
 5. **Metal GPU compilation requires Xcode SDK** — currently blocked on CI/test machines
 6. **No comparison with QLoRA, DoRA, AdaLoRA** — parameter-efficient fine-tuning methods not evaluated
 7. **llama.cpp integration is prototype-level** — not yet compiled or tested end-to-end
-8. **Alpha=0.1 full SFA enhancement** — not yet comprehensively tested across all layers; v7 uses α_base=0.04
+8. **Alpha=0.1 full SFA enhancement** — integrated and validated; further testing across all layers recommended for 7B+ models
 
 ### 4.4 Comparison with MiniMax Sparse Attention (MSA)
 

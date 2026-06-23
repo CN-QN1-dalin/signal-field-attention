@@ -62,12 +62,13 @@ extended_experiment_results.json
 顶会*.md
 
 # Legacy Soma directories (moved to archive/)
-01_soma_engine/
-02_soma_lingya/
-03_soma_native/
-04_soma_convergence/
-05_soma_heritage/
-06_soma_v7_demo/
+# Note: 01_soma_engine/ and 06_soma_v7_demo/ are still actively used and tracked
+# 01_soma_engine/
+# 02_soma_lingya/
+# 03_soma_native/
+# 04_soma_convergence/
+# 05_soma_heritage/
+# 06_soma_v7_demo/
 
 # Archive directory
 archive/

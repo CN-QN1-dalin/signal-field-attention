@@ -41,7 +41,7 @@ from soma_engine import (
 
 @dataclass
 class BenchmarkConfig:
-    model_path: str = "/Users/apple/Models/Qwen2.5-0.5B-Instruct"
+    model_path: str = "/Users/apple/models/Qwen2.5-0.5B-Instruct"
     k: int = 16
     gamma: float = 0.98
     alpha: float = 0.1

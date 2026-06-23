@@ -7,7 +7,7 @@ Soma v7多层端到端推理脚本
 - v7a保守版: 替换8层 [8-15], 保留24层注意力
 - v7b激进版: 替换24层 [4-27], 保留8层注意力
 
-信号场参数: k=8, kn=256, base_alpha=0.04, 自适应alpha
+信号场参数: k=8, kn=256, base_alpha=0.1, 自适应alpha
 """
 import gc, sys, time, json, os, subprocess, resource
 from pathlib import Path
