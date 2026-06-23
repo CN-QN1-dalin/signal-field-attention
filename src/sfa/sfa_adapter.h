@@ -8,7 +8,7 @@
 // 安全：std::vector内存管理、边界检查、线程安全
 // ==========================================
 
-#include "/tmp/llama.cpp/ggml/include/ggml.h"
+#include "ggml.h"
 #include "llama-graph.h"
 #include <memory>
 #include <cstring>

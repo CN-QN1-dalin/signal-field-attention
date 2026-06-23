@@ -24,11 +24,11 @@ struct sfa_config {
     
     sfa_config()
         : enabled(true),
-          alpha_base(2.0f),
-          cross_decay(0.7f),
+          alpha_base(0.1f),
+          cross_decay(0.8f),
           ema_gamma(0.98f),
           gaussian_gamma(0.951229f),
-          enhancement_clip(0.01f),
+          enhancement_clip(0.5f),
           ring_size(16),
           semantic_slots(64) {}
 };

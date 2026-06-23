@@ -8,7 +8,7 @@
 // 通道3: Semantic Pool - 语义注意力（跨token关联）
 // ==========================================
 
-#include "/tmp/llama.cpp/ggml/include/ggml.h"
+#include "ggml.h"
 #include <vector>
 #include <cmath>
 #include <cstring>

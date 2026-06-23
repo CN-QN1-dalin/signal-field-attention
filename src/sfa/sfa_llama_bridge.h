@@ -52,13 +52,14 @@ void sfa_llama_free();
 
 /**
  * 在 attention 层之后构建 SFA 增强
+ * 返回增强后的 attention tensor
  * 
  * @param ctx0 ggml 临时上下文
- * @param attn_out 当前层的 attention 输出
+ * @param attn_out 当前层的 attention 输出 [batch, seq_len, hidden]
  * @param layer_idx 当前层索引
  * @param seq_id 当前序列 ID
- * @param gf ggml 计算图（可选）
- * @return 增强后的 attention 输出
+ * @param gf ggml 计算图
+ * @return 增强后的 attention 输出 tensor
  */
 ggml_tensor * sfa_llama_build_enhance(
     ggml_context *ctx0,

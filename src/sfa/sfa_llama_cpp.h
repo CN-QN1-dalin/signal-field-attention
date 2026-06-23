@@ -117,7 +117,7 @@ extern "C" {
  * Must be called before building the graph.
  */
 void sfa_init(sfa_context *ctx, int n_layers, int hidden_size,
-              float alpha_base = 2.0f, float cross_decay = SFA_CROSS_DECAY_DEFAULT);
+              float alpha_base = 0.1f, float cross_decay = SFA_CROSS_DECAY_DEFAULT);
 
 /**
  * Enable/disable SFA enhancement.
