@@ -2,45 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
-
-## [2026-06-22] - SFA v7 Integration Complete
+## [Unreleased] - 2026-06-23
 
 ### Added
-- SFA v7 random projection orthogonality fix (v4)
-- llama.cpp integration bridge (`sfa_llama_bridge.cpp`)
-- Metal GPU kernel implementation (`sfa_kernel.metal`)
-- Integration test suite (`test_sfa_integration.py`, `test_sfa_correctness.py`)
-- Technical report appendix on orthogonality fix
-- Integration guide documentation
+- SFA v7 integration test suite (`test_sfa_integration.py`)
+- Orthogonality correctness test (`test_sfa_correctness.py`)
+- Metal GPU kernel (`src/sfa/sfa_kernel.metal`)
+- C++ bridge layer (`src/sfa/sfa_llama_bridge.cpp`)
+- Universal adapter pattern for llama.cpp integration (`src/sfa/sfa_llama_cpp.cpp`)
+- Integration guide (`docs/INTEGRATION_GUIDE.md`)
+- LLaMA.cpp integration checklist (`docs/LLAMA_CPP_INTEGRATION_CHECKLIST.md`)
 
 ### Changed
-- Updated TECHNICAL_REPORT.md with latest results
-- Fixed ggml API usage in `sfa_llama_cpp.cpp`
-- Improved multi-sequence state isolation
+- Calibrated SFA constants: ALPHA_BASE=0.1, ENHANCEMENT_CLIP=0.5, CROSS_DECAY=0.8
+- Replaced `ggml_new_i32` with `ggml_new_tensor_1d + ggml_set_f32` for API compliance
+- Fixed field_state tensor shape handling in `build_sfa_enhance`
+- Implemented proper sequence lifecycle hooks (seq_cp/seq_rm)
 
 ### Fixed
-- P0 Bug 1: field_state tensor shape handling
-- P0 Bug 2: n_sfa_layers misuse in layer_alpha calculation
-- P0 Bug 3: seq_cp/seq_rm lifecycle hooks
-- Ring buffer mean calculation using correct ggml_mean API
-- Semantic pool attention matrix multiplication order
+- Removed hardcoded paths (`/tmp/llama.cpp/ggml/include/ggml.h`)
+- Resolved stale constant values in `sfa_lockfree.h`
+- Thread safety improvements in global state management
 
-### Performance
-- Cosine similarity reduced from 0.65 to -0.042 ~ 0.007
-- PPL improvement: -1.61% to -5.79% on real models
-- Memory compression: 248x at 64K sequence
-
-## [2026-06-21] - Project Renamed to Dalin Soma
-
-### Changed
-- Project renamed from "Taicu/QN1" to "Dalin Soma"
-- Repository structure cleaned and organized
-- License changed to MIT
-
-## [2026-06-16] - Initial Release
-
-### Added
-- SFA v7 multi-layer end-to-end validation
-- Metal GPU kernel pipeline
-- llama.cpp integration prototype
+### Test Results
+- Qwen2.5-0.5B: Orthogonality cosine ≈ 0.0 (target < 0.1)
+- Memory compression: 248x at seq=4096, 3972x at seq=65536
+- Enhancement ratio: ~3.3% of attention output
