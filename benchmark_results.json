@@ -1,90 +1,90 @@
 {
   "correctness": {
     "seq_16": {
-      "mean_error": 0.0089062201,
-      "max_error": 0.544784,
-      "similarity_all": 0.992407,
+      "mean_error": 0.0088651134,
+      "max_error": 0.520238,
+      "similarity_all": 0.991495,
       "similarity_skip_t0": 1.0
     },
     "seq_32": {
-      "mean_error": 0.0031045349,
-      "max_error": 0.318939,
-      "similarity_all": 0.996559,
+      "mean_error": 0.0031350397,
+      "max_error": 0.343237,
+      "similarity_all": 0.997096,
       "similarity_skip_t0": 1.0
     },
     "seq_64": {
-      "mean_error": 0.0011484456,
-      "max_error": 0.227271,
-      "similarity_all": 0.998468,
+      "mean_error": 0.0010987164,
+      "max_error": 0.229407,
+      "similarity_all": 0.998837,
       "similarity_skip_t0": 1.0
     },
     "seq_128": {
-      "mean_error": 0.000349648,
-      "max_error": 0.170036,
-      "similarity_all": 0.99946,
+      "mean_error": 0.0004111505,
+      "max_error": 0.197139,
+      "similarity_all": 0.999441,
       "similarity_skip_t0": 1.0
     },
     "seq_256": {
-      "mean_error": 0.0001362019,
-      "max_error": 0.116532,
-      "similarity_all": 0.999792,
+      "mean_error": 0.0001388864,
+      "max_error": 0.113566,
+      "similarity_all": 0.999771,
       "similarity_skip_t0": 1.0
     },
     "seq_512": {
-      "mean_error": 5.3288e-05,
-      "max_error": 0.09883,
-      "similarity_all": 0.999873,
+      "mean_error": 5.33322e-05,
+      "max_error": 0.076871,
+      "similarity_all": 0.99989,
       "similarity_skip_t0": 1.0
     },
     "seq_1024": {
-      "mean_error": 1.83869e-05,
-      "max_error": 0.058407,
-      "similarity_all": 0.999956,
+      "mean_error": 1.81921e-05,
+      "max_error": 0.062709,
+      "similarity_all": 0.999958,
       "similarity_skip_t0": 1.0
     }
   },
   "speed": {
     "seq_64": {
-      "std_prefill_ms": 2.33,
-      "soma_prefill_ms": 16.92,
-      "speedup": 0.14,
-      "decode_ms_token": 1.936
+      "std_prefill_ms": 0.93,
+      "soma_prefill_ms": 14.13,
+      "speedup": 0.07,
+      "decode_ms_token": 1.0717
     },
     "seq_128": {
-      "std_prefill_ms": 3.25,
-      "soma_prefill_ms": 46.61,
-      "speedup": 0.07,
-      "decode_ms_token": 2.3993
+      "std_prefill_ms": 2.58,
+      "soma_prefill_ms": 27.25,
+      "speedup": 0.09,
+      "decode_ms_token": 1.3718
     },
     "seq_256": {
-      "std_prefill_ms": 5.57,
-      "soma_prefill_ms": 74.39,
-      "speedup": 0.07,
-      "decode_ms_token": 2.3941
+      "std_prefill_ms": 2.91,
+      "soma_prefill_ms": 54.08,
+      "speedup": 0.05,
+      "decode_ms_token": 1.3626
     },
     "seq_512": {
-      "std_prefill_ms": 11.67,
-      "soma_prefill_ms": 151.68,
-      "speedup": 0.08,
-      "decode_ms_token": 3.5352
+      "std_prefill_ms": 3.23,
+      "soma_prefill_ms": 136.05,
+      "speedup": 0.02,
+      "decode_ms_token": 1.683
     },
     "seq_1024": {
-      "std_prefill_ms": 29.27,
-      "soma_prefill_ms": 298.61,
-      "speedup": 0.1,
-      "decode_ms_token": 3.5869
+      "std_prefill_ms": 10.23,
+      "soma_prefill_ms": 225.73,
+      "speedup": 0.05,
+      "decode_ms_token": 1.9513
     },
     "seq_2048": {
-      "std_prefill_ms": 79.15,
-      "soma_prefill_ms": 654.9,
-      "speedup": 0.12,
-      "decode_ms_token": 4.0172
+      "std_prefill_ms": 35.01,
+      "soma_prefill_ms": 516.89,
+      "speedup": 0.07,
+      "decode_ms_token": 2.8726
     },
     "seq_4096": {
-      "std_prefill_ms": 284.04,
-      "soma_prefill_ms": 1352.28,
-      "speedup": 0.21,
-      "decode_ms_token": 6.8559
+      "std_prefill_ms": 130.16,
+      "soma_prefill_ms": 1005.83,
+      "speedup": 0.13,
+      "decode_ms_token": 4.5143
     }
   },
   "memory": {
