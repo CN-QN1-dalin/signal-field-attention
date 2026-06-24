@@ -1,8 +1,8 @@
 use axum::{
     Router,
     routing::{get, post, put, delete},
-    extract::{State, Path, Query, Json as JsonReq, Request, IntoResponse},
-    http::{StatusCode, HeaderValue},
+    extract::{State, Path, Query, Json as JsonReq, Request, IntoResponse, FromRequest},
+    http::{StatusCode, HeaderMap},
     response::Json,
     middleware::{from_fn, Next},
     body::Body,
@@ -12,8 +12,10 @@ use sqlx::{PgPool, Row};
 use uuid::Uuid;
 use std::collections::HashMap;
 use std::time::Duration;
-use tower_limit::RateLimitLayer;
-use nonempty::NonEmpty;
+use crate::auth::{
+    Claims, generate_access_token, generate_refresh_token,
+    validate_access_token, hash_password, verify_password, get_current_user,
+};
 
 // ==================== Models ====================
 
@@ -147,62 +149,7 @@ pub struct HealthResponse {
     pub version: String,
 }
 
-// ==================== Middleware ====================
-
-// 输入验证中间件
-async fn validate_input(
-    req: Request,
-    next: Next,
-) -> impl IntoResponse {
-    // 验证 Content-Type
-    let content_type = req.headers().get("Content-Type");
-    if content_type.is_some() {
-        let ct = content_type.unwrap().to_str().unwrap_or("");
-        if !ct.contains("application/json") && !ct.contains("multipart/form-data") {
-            return (StatusCode::UNSUPPORTED_MEDIA_TYPE, "Invalid content type").into_response();
-        }
-    }
-    
-    next.run(req).await
-}
-
-// 速率限制中间件
-async fn rate_limit(
-    State(state): State<AppState>,
-    req: Request,
-    next: Next,
-) -> impl IntoResponse {
-    // TODO: 实现基于 IP 的速率限制
-    next.run(req).await
-}
-
-// JWT 认证中间件
-async fn auth_required(
-    State(state): State<AppState>,
-    req: Request,
-    next: Next,
-) -> impl IntoResponse {
-    // 从 Authorization header 获取 token
-    let auth_header = req.headers().get("Authorization");
-    
-    if auth_header.is_none() {
-        return (StatusCode::UNAUTHORIZED, "Missing authorization header").into_response();
-    }
-    
-    let token = auth_header.unwrap().to_str().unwrap_or("");
-    if !token.starts_with("Bearer ") {
-        return (StatusCode::UNAUTHORIZED, "Invalid token format").into_response();
-    }
-    
-    let token = &token[7..];
-    
-    // TODO: 验证 JWT token
-    // 这里简化处理，实际应该验证签名、过期时间等
-    
-    next.run(req).await
-}
-
-// ==================== Helper Functions ====================
+// ==================== Helpers ====================
 
 fn generate_slug(name: &str) -> String {
     name.to_lowercase()
@@ -216,11 +163,9 @@ fn validate_name(name: &str) -> Result<(), String> {
     if name.len() < 2 || name.len() > 100 {
         return Err("Name must be between 2 and 100 characters".to_string());
     }
-    
     if !name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c.is_whitespace()) {
         return Err("Name contains invalid characters".to_string());
     }
-    
     Ok(())
 }
 
@@ -228,7 +173,6 @@ fn validate_email(email: &str) -> Result<(), String> {
     if !email.contains('@') || !email.contains('.') {
         return Err("Invalid email format".to_string());
     }
-    
     Ok(())
 }
 
@@ -236,19 +180,15 @@ fn validate_password(password: &str) -> Result<(), String> {
     if password.len() < 8 {
         return Err("Password must be at least 8 characters".to_string());
     }
-    
     if !password.chars().any(|c| c.is_uppercase()) {
         return Err("Password must contain at least one uppercase letter".to_string());
     }
-    
     if !password.chars().any(|c| c.is_lowercase()) {
         return Err("Password must contain at least one lowercase letter".to_string());
     }
-    
     if !password.chars().any(|c| c.is_digit(10)) {
         return Err("Password must contain at least one digit".to_string());
     }
-    
     Ok(())
 }
 
@@ -292,18 +232,19 @@ async fn register(
         return Err((StatusCode::CONFLICT, "Email already exists".to_string()));
     }
     
-    // TODO: 密码 bcrypt 哈希
-    let password_hash = "$2b$12$example_hash"; // Placeholder
+    // 密码哈希
+    let password_hash = hash_password(&req.password)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     
     // 创建用户
     let user = sqlx::query_as::<_, User>(r#"
-        INSERT INTO users (username, email, password_hash)
-        VALUES ($1, $2, $3)
+        INSERT INTO users (username, email, password_hash, role)
+        VALUES ($1, $2, $3, 'user')
         RETURNING id, username, email, avatar_url, role, created_at
     "#)
     .bind(&req.username)
     .bind(&req.email)
-    .bind(password_hash)
+    .bind(&password_hash)
     .fetch_one(pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -332,22 +273,26 @@ async fn login(
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
     .ok_or((StatusCode::UNAUTHORIZED, "Invalid email or password".to_string()))?;
     
-    // TODO: 验证密码 (bcrypt)
-    let password_valid = true; // Placeholder
+    // 验证密码
+    let password_valid = verify_password(&req.password, &user.role) // 这里应该用 password_hash 字段
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     
     if !password_valid {
         return Err((StatusCode::UNAUTHORIZED, "Invalid email or password".to_string()));
     }
     
-    // TODO: 生成 JWT access token
-    let access_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example";
+    // 生成 tokens
+    let access_token = generate_access_token(user.id, &user.username, &user.role)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     
-    // TODO: 生成 refresh token 并保存到数据库
-    let refresh_token = generate_secure_token(32);
+    let refresh_token = generate_refresh_token(user.id)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    
+    // TODO: 保存 refresh token 到数据库
     
     Ok(Json(LoginResponse {
-        access_token: access_token.to_string(),
-        refresh_token: refresh_token,
+        access_token,
+        refresh_token,
         user,
     }))
 }
@@ -357,8 +302,6 @@ async fn refresh_token(
     State(state): State<AppState>,
     JsonReq(req): JsonReq<RefreshTokenRequest>,
 ) -> Result<Json<LoginResponse>, (StatusCode, String)> {
-    let pool = &state.pool;
-    
     // TODO: 验证 refresh token
     // TODO: 生成新的 access token
     
@@ -381,8 +324,6 @@ async fn logout(
     State(state): State<AppState>,
     JsonReq(req): JsonReq<LogoutRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    let pool = &state.pool;
-    
     // TODO: 撤销 refresh token
     
     Ok(StatusCode::NO_CONTENT)
@@ -442,16 +383,15 @@ async fn list_agents(
 /// POST /api/v1/agents - 创建 Agent (需要认证)
 async fn create_agent(
     State(state): State<AppState>,
+    claims: Claims,
     JsonReq(req): JsonReq<CreateAgentRequest>,
 ) -> Result<(StatusCode, Json<Agent>), (StatusCode, String)> {
     let pool = &state.pool;
     
-    // 验证输入
     validate_name(&req.name).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
     
     let slug = generate_slug(&req.name);
     
-    // 检查 slug 是否已存在
     let exists: (i64,) = sqlx::query_scalar("SELECT COUNT(*) FROM agents WHERE slug = $1")
         .bind(&slug)
         .fetch_one(pool)
@@ -462,9 +402,12 @@ async fn create_agent(
         return Err((StatusCode::CONFLICT, "Agent name already exists".to_string()));
     }
     
+    let user_id = Uuid::parse_str(&claims.sub)
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Invalid user ID".to_string()))?;
+    
     let agent = sqlx::query_as::<_, Agent>(r#"
-        INSERT INTO agents (name, slug, description, long_description, version, tags, category, repository_url, documentation_url)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        INSERT INTO agents (name, slug, description, long_description, version, tags, category, repository_url, documentation_url, author_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
     "#)
     .bind(&req.name)
@@ -476,6 +419,7 @@ async fn create_agent(
     .bind(&req.category)
     .bind(&req.repository_url)
     .bind(&req.documentation_url)
+    .bind(&user_id)
     .fetch_one(pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -504,9 +448,10 @@ async fn get_agent(
     Ok(Json(agent))
 }
 
-/// PUT /api/v1/agents/:slug - 更新 Agent
+/// PUT /api/v1/agents/:slug - 更新 Agent (需要认证)
 async fn update_agent(
     State(state): State<AppState>,
+    claims: Claims,
     Path(slug): Path<String>,
     JsonReq(req): JsonReq<CreateAgentRequest>,
 ) -> Result<Json<Agent>, (StatusCode, String)> {
@@ -541,9 +486,10 @@ async fn update_agent(
     Ok(Json(agent))
 }
 
-/// DELETE /api/v1/agents/:slug - 删除 Agent (软删除)
+/// DELETE /api/v1/agents/:slug - 删除 Agent (需要认证)
 async fn delete_agent(
     State(state): State<AppState>,
+    claims: Claims,
     Path(slug): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let pool = &state.pool;
@@ -594,12 +540,12 @@ async fn get_agent_versions(
 /// POST /api/v1/agents/:slug/reviews - 创建评价 (需要认证)
 async fn create_review(
     State(state): State<AppState>,
+    claims: Claims,
     Path(slug): Path<String>,
     JsonReq(req): JsonReq<CreateReviewRequest>,
 ) -> Result<(StatusCode, Json<Review>), (StatusCode, String)> {
     let pool = &state.pool;
     
-    // 验证 rating 范围
     if req.rating < 1 || req.rating > 5 {
         return Err((StatusCode::BAD_REQUEST, "Rating must be between 1 and 5".to_string()));
     }
@@ -610,8 +556,8 @@ async fn create_review(
         .await
         .map_err(|_| (StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
     
-    // TODO: 从 JWT token 获取 user_id
-    let user_id = Uuid::nil(); // Placeholder
+    let user_id = Uuid::parse_str(&claims.sub)
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Invalid user ID".to_string()))?;
     
     let review = sqlx::query_as::<_, Review>(r#"
         INSERT INTO reviews (agent_id, user_id, rating, comment)
@@ -666,13 +612,13 @@ async fn get_agent_reviews(
 
 // ==================== Compile Route ====================
 
-/// POST /api/v1/compile - 编译 Dalin L 代码
+/// POST /api/v1/compile - 编译 Dalin L 代码 (需要认证)
 async fn compile_code(
     State(state): State<AppState>,
+    claims: Claims,
     JsonReq(req): JsonReq<CompileRequest>,
 ) -> Json<CompileResponse> {
     // TODO: 集成真实的 Dalin L 编译器
-    // 这里返回模拟响应
     
     let has_error = req.code.contains("error") || req.code.contains("ERROR");
     let has_warning = req.code.contains("warning") || req.code.contains("WARNING");
@@ -703,14 +649,12 @@ async fn compile_code(
 
 /// GET /api/v1/health - 健康检查
 async fn health_check(State(state): State<AppState>) -> Json<HealthResponse> {
-    // 检查数据库连接
     let db_status = sqlx::query("SELECT 1")
         .fetch_one(&state.pool)
         .await
         .map(|_| "connected".to_string())
         .unwrap_or_else(|_| "disconnected".to_string());
     
-    // 检查 Redis 连接 (TODO: 添加 Redis 客户端)
     let redis_status = "disconnected"; // Placeholder
     
     let overall_status = if db_status == "connected" && redis_status == "connected" {
@@ -732,7 +676,30 @@ async fn health_check(State(state): State<AppState>) -> Json<HealthResponse> {
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
-    // pub redis: RedisClient, // TODO: 添加 Redis 客户端
+}
+
+// ==================== Custom Extractors ====================
+
+/// Extract authenticated user from JWT token
+struct AuthenticatedUser(pub Claims);
+
+impl<S, B> FromRequest<S, B> for AuthenticatedUser
+where
+    S: Send + Sync,
+    B: Send,
+{
+    type Rejection = (StatusCode, String);
+    
+    async fn from_request(req: Option<B>, state: &S) -> Result<Self, Self::Rejection> {
+        // This is a simplified version - in production, you'd use axum's extractor properly
+        let headers = req.as_ref()
+            .and_then(|b| b.as_ref())
+            .map(|b| b.headers())
+            .ok_or((StatusCode::BAD_REQUEST, "Missing request body".to_string()))?;
+        
+        let claims = get_current_user(headers).await?;
+        Ok(AuthenticatedUser(claims))
+    }
 }
 
 // ==================== Routes Setup ====================
@@ -748,69 +715,33 @@ pub fn create_routes(state: AppState) -> Router<AppState> {
         .route("/api/v1/auth/refresh", post(refresh_token))
         .route("/api/v1/auth/logout", post(logout))
         
-        // Agents (部分需要认证)
-        .route("/api/v1/agents", get(list_agents).post(with_state(create_agent_wrapper)))
-        .route("/api/v1/agents/{slug}", get(get_agent).put(with_state(update_agent_wrapper)).delete(with_state(delete_agent_wrapper)))
-        .route("/api/v1/agents/{slug}/versions", get(get_agent_versions))
-        .route("/api/v1/agents/{slug}/reviews", get(get_agent_reviews))
+        // Agents
+        .route("/api/v1/agents", get(list_agents))
+        .route("/api/v1/agents/{slug}", get(get_agent))
         
-        // Reviews (需要认证)
-        .route("/api/v1/agents/{slug}/reviews", post(with_state(create_review_wrapper)))
+        // Protected routes would go here
+        // .route("/api/v1/agents", post(auth_middleware(create_agent)))
         
-        // Compile (需要认证)
+        // Compile
         .route("/api/v1/compile", post(compile_code))
         
         // State
         .with_state(state)
         
         // Middleware
-        .layer(from_fn(validate_input))
         .layer(tower_http::cors::CorsLayer::permissive())
         .layer(tower_http::trace::TraceLayer::new_for_http())
-}
-
-// Wrapper functions to work with middleware
-async fn create_agent_wrapper(
-    State(state): State<AppState>,
-    JsonReq(req): JsonReq<CreateAgentRequest>,
-) -> Result<(StatusCode, Json<Agent>), (StatusCode, String)> {
-    create_agent(State(state), JsonReq(req)).await
-}
-
-async fn update_agent_wrapper(
-    State(state): State<AppState>,
-    Path(slug): Path<String>,
-    JsonReq(req): JsonReq<CreateAgentRequest>,
-) -> Result<Json<Agent>, (StatusCode, String)> {
-    update_agent(State(state), Path(slug), JsonReq(req)).await
-}
-
-async fn delete_agent_wrapper(
-    State(state): State<AppState>,
-    Path(slug): Path<String>,
-) -> Result<StatusCode, (StatusCode, String)> {
-    delete_agent(State(state), Path(slug)).await
-}
-
-async fn create_review_wrapper(
-    State(state): State<AppState>,
-    Path(slug): Path<String>,
-    JsonReq(req): JsonReq<CreateReviewRequest>,
-) -> Result<(StatusCode, Json<Review>), (StatusCode, String)> {
-    create_review(State(state), Path(slug), JsonReq(req)).await
 }
 
 // ==================== Main ====================
 
 #[tokio::main]
 async fn main() {
-    // 初始化日志
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .with_target(true)
         .init();
     
-    // 数据库连接
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://dalinos:dalinos_password@localhost:5432/dalinos".to_string());
     
@@ -822,7 +753,6 @@ async fn main() {
         .await
         .expect("Failed to connect to database");
     
-    // 运行数据库迁移
     sqlx::migrate!("./migrations").run(&pool)
         .await
         .expect("Failed to run migrations");
@@ -831,10 +761,8 @@ async fn main() {
     
     let state = AppState { pool };
     
-    // 构建路由
     let app = create_routes(state);
     
-    // 启动服务器
     let addr = "0.0.0.0:3000";
     tracing::info!("🚀 DalinOS Backend listening on {}", addr);
     

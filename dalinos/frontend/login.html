@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DalinOS — 登录</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .shake {
+            animation: shake 0.5s;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+        <!-- Logo -->
+        <div class="text-center mb-8">
+            <span class="text-4xl">🌌</span>
+            <h1 class="text-2xl font-bold text-purple-400 mt-2">DalinOS</h1>
+            <p class="text-gray-400 mt-1">让 AI Agent 自己开发应用</p>
+        </div>
+
+        <!-- Login Form -->
+        <div id="login-form" class="glass-card p-8 rounded-xl">
+            <h2 class="text-xl font-bold mb-6 text-center">登录</h2>
+            
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="mb-4">
+                    <label class="block text-gray-300 mb-2" for="email">邮箱</label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        class="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500 text-white"
+                        placeholder="your@email.com"
+                        required
+                    >
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-300 mb-2" for="password">密码</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        class="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500 text-white"
+                        placeholder="••••••••"
+                        required
+                    >
+                </div>
+                
+                <button 
+                    type="submit" 
+                    id="loginBtn"
+                    class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded-lg font-semibold transition flex items-center justify-center"
+                >
+                    <span id="loginText">登录</span>
+                    <svg id="loginSpinner" class="animate-spin ml-2 hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+            </form>
+            
+            <div id="errorMessage" class="mt-4 text-red-400 text-sm text-center hidden"></div>
+            
+            <div class="mt-6 text-center">
+                <p class="text-gray-400">还没有账户？</p>
+                <a href="/register" class="text-purple-400 hover:text-purple-300 font-semibold">立即注册</a>
+            </div>
+        </div>
+
+        <!-- Register Form (Hidden by default) -->
+        <div id="register-form" class="glass-card p-8 rounded-xl hidden">
+            <h2 class="text-xl font-bold mb-6 text-center">注册</h2>
+            
+            <form id="registerForm" onsubmit="handleRegister(event)">
+                <div class="mb-4">
+                    <label class="block text-gray-300 mb-2" for="reg-username">用户名</label>
+                    <input 
+                        type="text" 
+                        id="reg-username" 
+                        class="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500 text-white"
+                        placeholder="dalinos"
+                        required
+                        minlength="2"
+                        maxlength="100"
+                    >
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-300 mb-2" for="reg-email">邮箱</label>
+                    <input 
+                        type="email" 
+                        id="reg-email" 
+                        class="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500 text-white"
+                        placeholder="your@email.com"
+                        required
+                    >
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-300 mb-2" for="reg-password">密码</label>
+                    <input 
+                        type="password" 
+                        id="reg-password" 
+                        class="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500 text-white"
+                        placeholder="至少8位，含大小写字母和数字"
+                        required
+                        minlength="8"
+                    >
+                    <p class="text-gray-500 text-xs mt-1">至少8位，含大小写字母和数字</p>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-300 mb-2" for="reg-password-confirm">确认密码</label>
+                    <input 
+                        type="password" 
+                        id="reg-password-confirm" 
+                        class="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500 text-white"
+                        placeholder="再次输入密码"
+                        required
+                    >
+                </div>
+                
+                <button 
+                    type="submit" 
+                    id="registerBtn"
+                    class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded-lg font-semibold transition flex items-center justify-center"
+                >
+                    <span id="registerText">注册</span>
+                    <svg id="registerSpinner" class="animate-spin ml-2 hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+            </form>
+            
+            <div id="registerErrorMessage" class="mt-4 text-red-400 text-sm text-center hidden"></div>
+            
+            <div class="mt-6 text-center">
+                <p class="text-gray-400">已有账户？</p>
+                <a href="/login" class="text-purple-400 hover:text-purple-300 font-semibold">立即登录</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function handleLogin(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorMessage = document.getElementById('errorMessage');
+            const loginBtn = document.getElementById('loginBtn');
+            const loginText = document.getElementById('loginText');
+            const loginSpinner = document.getElementById('loginSpinner');
+            
+            // Show loading state
+            loginBtn.disabled = true;
+            loginText.textContent = '登录中...';
+            loginSpinner.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+            
+            // Simulate API call
+            setTimeout(() => {
+                // Reset button state
+                loginBtn.disabled = false;
+                loginText.textContent = '登录';
+                loginSpinner.classList.add('hidden');
+                
+                // Simulate success
+                alert('登录成功！跳转到首页...');
+                // window.location.href = '/dashboard';
+            }, 1500);
+        }
+        
+        function handleRegister(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('reg-username').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            const passwordConfirm = document.getElementById('reg-password-confirm').value;
+            const errorMessage = document.getElementById('registerErrorMessage');
+            const registerBtn = document.getElementById('registerBtn');
+            const registerText = document.getElementById('registerText');
+            const registerSpinner = document.getElementById('registerSpinner');
+            
+            // Validate passwords match
+            if (password !== passwordConfirm) {
+                errorMessage.textContent = '两次输入的密码不一致';
+                errorMessage.classList.remove('hidden');
+                document.getElementById('register-form').classList.add('shake');
+                setTimeout(() => {
+                    document.getElementById('register-form').classList.remove('shake');
+                }, 500);
+                return;
+            }
+            
+            // Show loading state
+            registerBtn.disabled = true;
+            registerText.textContent = '注册中...';
+            registerSpinner.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+            
+            // Simulate API call
+            setTimeout(() => {
+                // Reset button state
+                registerBtn.disabled = false;
+                registerText.textContent = '注册';
+                registerSpinner.classList.add('hidden');
+                
+                // Simulate success
+                alert('注册成功！请登录...');
+                document.getElementById('register-form').classList.add('hidden');
+                document.getElementById('login-form').classList.remove('hidden');
+            }, 1500);
+        }
+        
+        // Check URL hash to show correct form
+        if (window.location.hash === '#register') {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('register-form').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
