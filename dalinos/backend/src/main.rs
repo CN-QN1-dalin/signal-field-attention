@@ -1,3 +1,11 @@
+// Module declarations
+mod auth;
+mod compiler;
+mod dashboard;
+mod forum;
+mod lingguang;
+mod social;
+
 use axum::{
     Router,
     routing::{get, post, put, delete},
@@ -16,6 +24,9 @@ use crate::auth::{
     Claims, generate_access_token, generate_refresh_token,
     validate_access_token, hash_password, verify_password, get_current_user,
 };
+use crate::forum::{forum_routes};
+use crate::lingguang::{lingguang_routes};
+use crate::social::{social_routes};
 
 // ==================== Models ====================
 
@@ -744,10 +755,80 @@ where
     }
 }
 
+// ==================== Dashboard Helpers ====================
+
+async fn get_dashboard_stats(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let pool = &state.pool;
+    
+    let agent_count: (i64,) = sqlx::query_scalar("SELECT COUNT(*) FROM agents WHERE status = 'active'")
+        .fetch_one(pool).await.ok().unwrap_or((0,));
+    let user_count: (i64,) = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+        .fetch_one(pool).await.ok().unwrap_or((0,));
+    let review_count: (i64,) = sqlx::query_scalar("SELECT COUNT(*) FROM reviews")
+        .fetch_one(pool).await.ok().unwrap_or((0,));
+    let download_count: (i64,) = sqlx::query_scalar("SELECT COALESCE(SUM(download_count), 0) FROM agents")
+        .fetch_one(pool).await.ok().unwrap_or((0,));
+    
+    Json(serde_json::json!({
+        "agents": agent_count.0,
+        "users": user_count.0,
+        "reviews": review_count.0,
+        "downloads": download_count.0
+    }))
+}
+
+async fn get_activity_logs(State(state): State<AppState>) -> Result<Json<Vec<serde_json::Value>>, (StatusCode, String)> {
+    let pool = &state.pool;
+    
+    let logs: Vec<serde_json::Value> = sqlx::query_scalar(r#"
+        SELECT json_build_object(
+            'id', id,
+            'user_id', user_id,
+            'action', action,
+            'entity_type', entity_type,
+            'entity_id', entity_id,
+            'created_at', created_at
+        )
+        FROM activity_logs
+        ORDER BY created_at DESC
+        LIMIT 50
+    "#)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    
+    Ok(Json(logs))
+}
+
+async fn get_notifications(State(state): State<AppState>) -> Result<Json<Vec<serde_json::Value>>, (StatusCode, String)> {
+    let pool = &state.pool;
+    
+    let notifications: Vec<serde_json::Value> = sqlx::query_scalar(r#"
+        SELECT json_build_object(
+            'id', id,
+            'user_id', user_id,
+            'title', title,
+            'message', message,
+            'is_read', is_read,
+            'created_at', created_at
+        )
+        FROM notifications
+        ORDER BY created_at DESC
+        LIMIT 20
+    "#)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    
+    Ok(Json(notifications))
+}
+
 // ==================== Routes Setup ====================
 
 pub fn create_routes(state: AppState) -> Router<AppState> {
-    Router::new()
+    use axum::routing::{get, post, put, delete};
+    
+    let router = Router::new()
         // Health
         .route("/api/v1/health", get(health_check))
         
@@ -758,21 +839,36 @@ pub fn create_routes(state: AppState) -> Router<AppState> {
         .route("/api/v1/auth/logout", post(logout))
         
         // Agents
-        .route("/api/v1/agents", get(list_agents))
-        .route("/api/v1/agents/{slug}", get(get_agent))
-        
-        // Protected routes would go here
-        // .route("/api/v1/agents", post(auth_middleware(create_agent)))
+        .route("/api/v1/agents", get(list_agents).post(create_agent))
+        .route("/api/v1/agents/{slug}", get(get_agent).put(update_agent).delete(delete_agent))
+        .route("/api/v1/agents/{slug}/versions", get(get_agent_versions))
+        .route("/api/v1/agents/{slug}/reviews", get(get_agent_reviews).post(create_review))
         
         // Compile
         .route("/api/v1/compile", post(compile_code))
+        
+        // Forum routes
+        .merge(forum_routes())
+        
+        // Lingguang routes (dreams, personality, tournaments)
+        .merge(lingguang_routes())
+        
+        // Social routes
+        .merge(social_routes())
+        
+        // Dashboard routes
+        .route("/api/v1/dashboard/stats", get(get_dashboard_stats))
+        .route("/api/v1/dashboard/logs", get(get_activity_logs))
+        .route("/api/v1/dashboard/notifications", get(get_notifications))
         
         // State
         .with_state(state)
         
         // Middleware
         .layer(tower_http::cors::CorsLayer::permissive())
-        .layer(tower_http::trace::TraceLayer::new_for_http())
+        .layer(tower_http::trace::TraceLayer::new_for_http());
+    
+    router
 }
 
 // ==================== Main ====================
