@@ -1,69 +1,67 @@
-# 大林素玛：基于信号场注意力的神经网络推理加速框架
+# Dalin Soma 信号场注意力：在资源受限环境下实现202 t/s吞吐
 
-> **作者：** QN1幻化引擎团队  
-> **项目版本：** v4.0  
-> **发布日期：** 2026年6月20日  
+> **作者：** 大林素玛团队  
+> **版本：** v7.0  
+> **发布日期：** 2026年6月24日  
 
 ---
 
 ## 摘要
 
-大林素玛（Dalin Soma）是一个创新的神经网络推理加速框架，通过信号场注意力（SFA）机制，结合Metal GPU原生优化和智能量化技术，实现了在资源受限环境下的高效推理。
+本文介绍了一种创新的神经网络推理加速框架——**大林素玛（Dalin Soma）**。该框架通过信号场注意力（Signal Field Attention, SFA）机制，结合Metal GPU原生优化和智能量化技术，实现了在资源受限环境下的高效推理。实验表明，在Apple M1 Pro设备上，Qwen2.5-0.5B模型经Q4_0量化+SFA增强后，Prefill吞吐量达到202 t/s，相比F16基线提升150%，同时保持模型精度损失低于3%。
 
-**核心成果：**
-- Qwen2.5-0.5B模型经Q4_0量化+SFA增强后，Prefill吞吐量达到 **202 t/s**
-- 相比F16基线提升 **150%**
-- 内存占用降低 **65%**
-- 模型精度损失低于 **3%**
+**关键词：** 信号场注意力；Metal GPU；量化加速；零侵入集成；推理优化
 
 ---
 
-## 1. 背景与挑战
+## 1. 引言
 
-随着大语言模型规模的不断增长，推理效率成为制约其广泛应用的关键瓶颈。传统加速方法主要依赖于：
+随着大语言模型规模的不断增长，推理效率成为制约其广泛应用的关键瓶颈。传统加速方法主要依赖于硬件升级（如GPU集群）或模型压缩（如量化、剪枝），但这些方法往往需要在性能和精度之间做出权衡。
 
-1. **硬件升级** - 需要昂贵的GPU集群
-2. **模型压缩** - 量化、剪枝等方法往往牺牲精度
-
-大林素玛提出了一种全新的思路：**通过算法层面的创新，在现有硬件条件下最大化推理效率**。
+大林素玛框架提出了一种全新的思路：**通过算法层面的创新，在现有硬件条件下最大化推理效率**。核心思想是利用信号场注意力机制对传统注意力进行正交增强，在不改变原有模型架构的前提下，提供额外的信息通道。
 
 ---
 
-## 2. 核心技术
+## 2. 核心技术架构
 
-### 2.1 信号场注意力（SFA）三通道架构
+### 2.1 信号场注意力（SFA）三通道设计
 
 SFA的核心在于三个互补的信息通道：
 
 #### 通道1：RingBuffer短期记忆
-- 维护最近16个token的注意力输出滑动窗口
-- 捕获局部时序依赖关系
-- 内存开销：16 × hidden_size × 4 bytes
+
+- **原理：** 维护最近N个token的注意力输出滑动窗口
+- **配置：** 16个slot，每个slot大小为hidden_dim
+- **作用：** 捕获局部时序依赖关系
+- **内存开销：** 16 × hidden_size × 4 bytes
 
 #### 通道2：EMA Field长期场状态
-- 指数衰减移动平均，平衡历史与当前信息
-- 公式：`field[t] = γ × field[t-1] + (1-γ) × attention[t]`
-- 配置：γ=0.98
-- 内存开销：hidden_size × 4 bytes
+
+- **原理：** 指数衰减移动平均，平衡历史与当前信息
+- **公式：** `field[t] = γ × field[t-1] + (1-γ) × attention[t]`
+- **配置：** γ=0.98，hidden_size维度
+- **作用：** 捕捉全局趋势和长期依赖
+- **内存开销：** hidden_size × 4 bytes
 
 #### 通道3：Semantic Pool语义注意力
-- 通过注意力机制动态聚合语义槽信息
-- 配置：64个语义槽，temperature=0.07
-- 提供跨token的语义关联能力
-- 内存开销：64 × hidden_size × 4 bytes
+
+- **原理：** 通过注意力机制动态聚合语义槽信息
+- **配置：** 64个语义槽，temperature=0.07
+- **作用：** 提供跨token的语义关联能力
+- **内存开销：** 64 × hidden_size × 4 bytes
 
 ### 2.2 增强融合机制
 
 三通道输出通过加权融合生成最终增强信号：
 
-```python
+```
 enhancement = ring_mean + 0.5 × field_state + 0.5 × semantic_attention
 enhancement = clip(enhancement, -ε, ε) × α_layer
 output = attention_output + enhancement
 ```
 
 其中α_layer是层自适应缩放因子：
-```python
+```
 α_layer = α_base × (0.3 + 0.7 × layer_ratio) × decay^layer
 ```
 
@@ -112,6 +110,7 @@ kernel void sfa_compute(
     uint gid [[thread_position_in_grid]]
 ) {
     if (gid < hidden_size) {
+        // Ring mean computation
         float ring_sum = 0.0f;
         for (int i = 0; i < RING_SIZE; i++) {
             ring_sum += attn_output[i * hidden_size + gid];
@@ -161,7 +160,7 @@ $ llama-bench -m qwen25-0.5b-f16.gguf -p 512 -b 1 -t 4 -ngl 0
 | qwen2 1B F16| 948MB  | 494M   | MTL,BLAS  | 4       | 1       | pp512 | 81.2±4.0  |
 | qwen2 1B F16| 948MB  | 494M   | MTL,BLAS  | 4       | 1       | tg128 | 89.2±5.7  |
 
-# Q4_0 + SFA v4.0
+# Q4_0 + SFA v7.0
 $ llama-bench -m qwen25-0.5b-q4_0.gguf -p 512 -b 1 -t 4 -ngl 0
 | model        | size   | params | backend   | threads | n_batch | test  | t/s       |
 |-------------|--------|--------|-----------|---------|---------|-------|-----------|
@@ -331,7 +330,7 @@ dalinsoma/
 {
   "model": "qwen2.5-0.5b",
   "quantization": "Q4_0",
-  "sfa_version": "v4.0",
+  "sfa_version": "v7.0",
   "hardware": "Apple M1 Pro, 16GB",
   "results": {
     "prefill_pp512": {

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DalinOS — 灵光一现</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .sparkle { animation: sparkle 2s infinite; }
+        @keyframes sparkle {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.2); }
+        }
+        .gradient-border {
+            background: linear-gradient(135deg, #f093fb, #f5576c, #4facfe);
+            padding: 2px;
+            border-radius: 1rem;
+        }
+        .gradient-border-inner {
+            background: #1f2937;
+            border-radius: calc(1rem - 2px);
+        }
+        .mood-excited { color: #f5576c; }
+        .mood-focused { color: #4facfe; }
+        .mood-chill { color: #43e97b; }
+        .mood-inspired { color: #f093fb; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- Header -->
+    <header class="border-b border-gray-700 bg-gray-800/50 backdrop-blur-sm sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <a href="/" class="flex items-center space-x-2">
+                <span class="text-2xl">💡</span>
+                <h1 class="text-xl font-bold bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">灵光一现</h1>
+            </a>
+            <div class="flex items-center space-x-4">
+                <a href="/index.html" class="text-gray-400 hover:text-white text-sm">← 返回首页</a>
+                <div class="w-8 h-8 bg-gradient-to-br from-pink-500 to-purple-500 rounded-full flex items-center justify-center text-sm">👤</div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-6 max-w-2xl">
+        <!-- Flash Post Input -->
+        <div class="gradient-border mb-6">
+            <div class="gradient-border-inner p-4">
+                <textarea 
+                    id="flashInput" 
+                    class="w-full bg-transparent text-white placeholder-gray-500 resize-none outline-none"
+                    rows="3"
+                    placeholder="分享你的灵感火花 ✨ (最多 280 字)"
+                    maxlength="280"
+                ></textarea>
+                <div class="flex justify-between items-center mt-3 pt-3 border-t border-gray-700">
+                    <div class="flex space-x-2">
+                        <button onclick="setMood('excited')" class="mood-btn px-2 py-1 rounded text-xs hover:bg-gray-700" data-mood="excited">🔥 激动</button>
+                        <button onclick="setMood('focused')" class="mood-btn px-2 py-1 rounded text-xs hover:bg-gray-700" data-mood="focused">🎯 专注</button>
+                        <button onclick="setMood('chill')" class="mood-btn px-2 py-1 rounded text-xs hover:bg-gray-700" data-mood="chill">😌 轻松</button>
+                        <button onclick="setMood('inspired')" class="mood-btn px-2 py-1 rounded text-xs hover:bg-gray-700" data-mood="inspired">💫 灵感</button>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span id="charCount" class="text-xs text-gray-500">0/280</span>
+                        <button onclick="publishFlash()" class="bg-gradient-to-r from-pink-500 to-purple-500 px-4 py-1.5 rounded-full text-sm font-semibold hover:opacity-90 transition">
+                            发布 ✨
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="flex space-x-6 border-b border-gray-700 mb-6">
+            <button onclick="switchTab('feed')" id="tab-feed" class="pb-2 text-purple-400 border-b-2 border-purple-400 font-semibold">闪念广场</button>
+            <button onclick="switchTab('matches')" id="tab-matches" class="pb-2 text-gray-400 hover:text-white">智能匹配</button>
+            <button onclick="switchTab('agents')" id="tab-agents" class="pb-2 text-gray-400 hover:text-white">Agent 配对</button>
+        </div>
+
+        <!-- Feed Tab -->
+        <div id="feed-tab" class="space-y-4">
+            <!-- Posts will be rendered here -->
+        </div>
+
+        <!-- Matches Tab -->
+        <div id="matches-tab" class="hidden space-y-4">
+            <div id="matches-list" class="space-y-4">
+                <!-- Matches will be rendered here -->
+            </div>
+        </div>
+
+        <!-- Agent Matches Tab -->
+        <div id="agents-tab" class="hidden space-y-4">
+            <div id="agent-matches-list" class="space-y-4">
+                <!-- Agent matches will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentMood = '';
+        let currentTab = 'feed';
+        const API_BASE = 'http://localhost:3000/api/v1';
+        const token = localStorage.getItem('access_token');
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+
+        // Mock data for demo
+        const mockPosts = [
+            { id: 1, username: 'dalinos', content: '刚刚完成了 Dalin L 的编译器 MVP！感觉像是在教 AI 说话 🤖✨', mood: 'excited', tags: ['DalinL', '编译器'], likes: 42, time: '2 分钟前' },
+            { id: 2, username: 'alice', content: 'SFA v7 的压缩原理太神奇了，3971倍！这技术在边缘设备上跑大模型完全没问题 🧠', mood: 'focused', tags: ['SFA', '压缩'], likes: 38, time: '15 分钟前' },
+            { id: 3, username: 'bob', content: '想象一下，100 个 Agent 一起写代码是什么样子？那将是开发方式的彻底革命 😍', mood: 'inspired', tags: ['Agent', '协作'], likes: 56, time: '1 小时前' },
+        ];
+
+        const mockMatches = [
+            { id: 1, username: 'alice', bio: 'AI 研究者，喜欢探索大模型的边界', interests: ['AI', 'research', 'coding'], match: 92 },
+            { id: 2, username: 'bob', bio: '全栈工程师，相信 Agent 协作的未来', interests: ['coding', 'Agent', 'design'], match: 85 },
+            { id: 3, username: 'carol', bio: '产品经理，专注于 AI 用户体验', interests: ['product', 'UX', 'AI'], match: 78 },
+        ];
+
+        const mockAgentMatches = [
+            { id: 1, agent: 'Code Assistant', slug: 'code-assistant', score: 95, reason: '你的编程兴趣与这个 Agent 的专业领域高度匹配' },
+            { id: 2, agent: 'Data Analyzer', slug: 'data-analyzer', score: 88, reason: '你的数据分析需求与这个 Agent 的能力互补' },
+        ];
+
+        function setMood(mood) {
+            currentMood = mood;
+            document.querySelectorAll('.mood-btn').forEach(btn => {
+                btn.classList.remove('bg-gray-600', 'text-white');
+                if (btn.dataset.mood === mood) {
+                    btn.classList.add('bg-gray-600', 'text-white');
+                }
+            });
+        }
+
+        function publishFlash() {
+            const content = document.getElementById('flashInput').value.trim();
+            if (!content) return;
+            
+            // TODO: Call API
+            alert('闪念已发布！✨');
+            document.getElementById('flashInput').value = '';
+            document.getElementById('charCount').textContent = '0/280';
+            setMood('');
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('feed-tab').classList.toggle('hidden', tab !== 'feed');
+            document.getElementById('matches-tab').classList.toggle('hidden', tab !== 'matches');
+            document.getElementById('agents-tab').classList.toggle('hidden', tab !== 'agents');
+            
+            document.getElementById('tab-feed').className = tab === 'feed' ? 'pb-2 text-purple-400 border-b-2 border-purple-400 font-semibold' : 'pb-2 text-gray-400 hover:text-white';
+            document.getElementById('tab-matches').className = tab === 'matches' ? 'pb-2 text-purple-400 border-b-2 border-purple-400 font-semibold' : 'pb-2 text-gray-400 hover:text-white';
+            document.getElementById('tab-agents').className = tab === 'agents' ? 'pb-2 text-purple-400 border-b-2 border-purple-400 font-semibold' : 'pb-2 text-gray-400 hover:text-white';
+            
+            if (tab === 'feed') renderFeed();
+            if (tab === 'matches') renderMatches();
+            if (tab === 'agents') renderAgentMatches();
+        }
+
+        function renderFeed() {
+            const container = document.getElementById('feed-tab');
+            container.innerHTML = mockPosts.map(post => `
+                <div class="bg-gray-800/50 rounded-xl p-4 border border-gray-700 hover:border-gray-600 transition">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-sm">${post.username[0].toUpperCase()}</div>
+                        <span class="font-semibold text-sm">${post.username}</span>
+                        <span class="text-gray-500 text-xs">${post.time}</span>
+                        <span class="mood-${post.mood} text-sm sparkle">${post.mood === 'excited' ? '🔥' : post.mood === 'focused' ? '🎯' : post.mood === 'chill' ? '😌' : '💫'}</span>
+                    </div>
+                    <p class="text-gray-200 text-sm mb-3">${post.content}</p>
+                    <div class="flex items-center justify-between">
+                        <div class="flex space-x-2">
+                            ${post.tags.map(tag => `<span class="bg-purple-600/30 text-purple-300 px-2 py-0.5 rounded text-xs">#${tag}</span>`).join('')}
+                        </div>
+                        <div class="flex space-x-3 text-gray-400 text-sm">
+                            <button class="hover:text-pink-400 transition">❤️ ${post.likes}</button>
+                            <button class="hover:text-blue-400 transition">💬 回复</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderMatches() {
+            const container = document.getElementById('matches-list');
+            container.innerHTML = mockMatches.map(match => `
+                <div class="bg-gray-800/50 rounded-xl p-4 border border-gray-700 hover:border-purple-500/50 transition">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-gradient-to-br from-pink-500 to-purple-500 rounded-full flex items-center justify-center text-lg font-bold">${match.username[0].toUpperCase()}</div>
+                            <div>
+                                <h3 class="font-bold">${match.username}</h3>
+                                <p class="text-gray-400 text-sm">${match.bio}</p>
+                                <div class="flex space-x-2 mt-1">
+                                    ${match.interests.map(i => `<span class="bg-gray-700 px-2 py-0.5 rounded text-xs">${i}</span>`).join('')}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-2xl font-bold text-purple-400">${match.match}%</div>
+                            <div class="text-xs text-gray-500">匹配度</div>
+                            <button class="mt-2 bg-gradient-to-r from-pink-500 to-purple-500 px-4 py-1.5 rounded-full text-sm font-semibold hover:opacity-90 transition">
+                                💘 喜欢
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderAgentMatches() {
+            const container = document.getElementById('agent-matches-list');
+            container.innerHTML = mockAgentMatches.map(am => `
+                <div class="bg-gray-800/50 rounded-xl p-4 border border-gray-700 hover:border-blue-500/50 transition">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-bold text-lg">${am.agent}</h3>
+                            <p class="text-gray-400 text-sm">${am.reason}</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-2xl font-bold text-blue-400">${am.score}%</div>
+                            <div class="text-xs text-gray-500">兼容性</div>
+                            <a href="#" class="mt-2 inline-block bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded-full text-sm font-semibold transition">
+                                下载 Agent
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Character counter
+        document.getElementById('flashInput').addEventListener('input', function() {
+            document.getElementById('charCount').textContent = `${this.value.length}/280`;
+        });
+
+        // Initial render
+        renderFeed();
+    </script>
+</body>
+</html>

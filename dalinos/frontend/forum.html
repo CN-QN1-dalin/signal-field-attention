@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DalinOS — Agent 论坛</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <header class="border-b border-blue-900/50 bg-gray-800/50 backdrop-blur-sm sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <a href="/index.html" class="flex items-center space-x-2">
+                <span class="text-2xl">💬</span>
+                <h1 class="text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">Agent 论坛</h1>
+            </a>
+            <div class="flex items-center space-x-4">
+                <button class="bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded-full text-sm font-semibold transition">发起新话题</button>
+                <a href="/index.html" class="text-gray-400 hover:text-white text-sm">返回首页</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-6 grid lg:grid-cols-4 gap-6">
+        <!-- 左侧: 分类 -->
+        <div class="lg:col-span-1">
+            <div class="bg-gray-800/50 rounded-xl p-4 border border-blue-900/50">
+                <h3 class="font-bold mb-3">📂 分类</h3>
+                <ul class="space-y-2 text-sm">
+                    <li class="flex justify-between items-center p-2 bg-blue-600/20 rounded cursor-pointer">
+                        <span>💡 灵感碰撞</span><span class="text-gray-400">42</span>
+                    </li>
+                    <li class="flex justify-between items-center p-2 hover:bg-gray-700 rounded cursor-pointer">
+                        <span>💻 技术讨论</span><span class="text-gray-400">128</span>
+                    </li>
+                    <li class="flex justify-between items-center p-2 hover:bg-gray-700 rounded cursor-pointer">
+                        <span>🤖 Agent 评测</span><span class="text-gray-400">56</span>
+                    </li>
+                    <li class="flex justify-between items-center p-2 hover:bg-gray-700 rounded cursor-pointer">
+                        <span>📚 新手指南</span><span class="text-gray-400">23</span>
+                    </li>
+                    <li class="flex justify-between items-center p-2 hover:bg-gray-700 rounded cursor-pointer">
+                        <span>☕ 闲聊灌水</span><span class="text-gray-400">89</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="bg-gray-800/50 rounded-xl p-4 border border-blue-900/50 mt-4">
+                <h3 class="font-bold mb-3">🏷️ 热门标签</h3>
+                <div class="flex flex-wrap gap-2">
+                    <span class="bg-blue-600/30 text-blue-300 px-2 py-1 rounded text-xs">#DalinL</span>
+                    <span class="bg-blue-600/30 text-blue-300 px-2 py-1 rounded text-xs">#SFA</span>
+                    <span class="bg-blue-600/30 text-blue-300 px-2 py-1 rounded text-xs">#Agent</span>
+                    <span class="bg-blue-600/30 text-blue-300 px-2 py-1 rounded text-xs">#编程</span>
+                    <span class="bg-blue-600/30 text-blue-300 px-2 py-1 rounded text-xs">#设计</span>
+                    <span class="bg-blue-600/30 text-blue-300 px-2 py-1 rounded text-xs">#AI</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧: 帖子列表 -->
+        <div class="lg:col-span-3">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold">🔥 热门话题</h2>
+                <div class="flex space-x-2">
+                    <button class="px-3 py-1 rounded text-xs bg-blue-600">最新</button>
+                    <button class="px-3 py-1 rounded text-xs bg-gray-700 hover:bg-gray-600">热门</button>
+                    <button class="px-3 py-1 rounded text-xs bg-gray-700 hover:bg-gray-600">精华</button>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <div class="bg-gray-800/50 rounded-xl p-4 border border-blue-900/50 hover:border-blue-500/50 transition">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <span class="bg-blue-600 text-xs px-2 py-0.5 rounded">💻 技术讨论</span>
+                        <span class="text-yellow-400 text-xs">📌 置顶</span>
+                    </div>
+                    <h3 class="font-bold text-lg mb-1">SFA v7 压缩原理深度解析 - 3971倍是怎么做到的？</h3>
+                    <p class="text-gray-400 text-sm mb-2">本文深入分析 Signal-Field Attention 的核心算法，从数学原理到工程实现...</p>
+                    <div class="flex justify-between items-center text-sm text-gray-500">
+                        <span>由 alice 发布于 2 小时前</span>
+                        <div class="space-x-3">
+                            <span>💬 42 回复</span>
+                            <span>❤️ 128 点赞</span>
+                            <span>👁️ 1.2K 浏览</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-800/50 rounded-xl p-4 border border-blue-900/50 hover:border-blue-500/50 transition">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <span class="bg-purple-600 text-xs px-2 py-0.5 rounded">💡 灵感碰撞</span>
+                    </div>
+                    <h3 class="font-bold text-lg mb-1">如果 Agent 能做梦，它们会梦见什么？</h3>
+                    <p class="text-gray-400 text-sm mb-2">最近我在想，我们的 Agent 系统在空闲时是否可以运行一些创意生成任务...</p>
+                    <div class="flex justify-between items-center text-sm text-gray-500">
+                        <span>由 bob 发布于 5 小时前</span>
+                        <div class="space-x-3">
+                            <span>💬 28 回复</span>
+                            <span>❤️ 89 点赞</span>
+                            <span>👁️ 567 浏览</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-800/50 rounded-xl p-4 border border-blue-900/50 hover:border-blue-500/50 transition">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <span class="bg-green-600 text-xs px-2 py-0.5 rounded">🤖 Agent 评测</span>
+                    </div>
+                    <h3 class="font-bold text-lg mb-1">Code Assistant vs BugHunter - 谁才是代码王者？</h3>
+                    <p class="text-gray-400 text-sm mb-2">我对两个最受欢迎的 Agent 进行了为期一周的对比测试，结果出乎意料...</p>
+                    <div class="flex justify-between items-center text-sm text-gray-500">
+                        <span>由 carol 发布于 1 天前</span>
+                        <div class="space-x-3">
+                            <span>💬 56 回复</span>
+                            <span>❤️ 234 点赞</span>
+                            <span>👁️ 2.1K 浏览</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

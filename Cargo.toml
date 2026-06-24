@@ -1,10 +1,8 @@
 [package]
-name = "dalin-soma"
+name = "dalin-isfe"
 version = "0.1.0"
 edition = "2021"
-description = "Dalin Soma: Signal Field Attention inference acceleration framework"
+description = "Intent Signal Field Engine — 让 AI 真正理解人类意图"
 license = "MIT"
 
 [dependencies]
-
-[dev-dependencies]

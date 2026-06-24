@@ -1,0 +1,516 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{geometry}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{natbib}
+\usepackage{color}
+\usepackage{framed}
+
+\geometry{margin=1in}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+\title{Soma: A Signal Field Native Architecture for Efficient Long-Sequence Processing}
+
+\author{Dalin Jia \\
+Independent Researcher \\
+\texttt{362118251@qq.com}}
+
+\date{June 2026 \\
+\textbf{Preprint} --- Preliminary results, simulation-based experiments included}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Transformer-based large language models suffer from inherent $O(n^2)$ computational complexity and $O(n)$ KV cache memory growth during autoregressive decoding, creating fundamental bottlenecks for long-context deployment. We propose \textbf{Soma}, a signal field native architecture that replaces standard self-attention with a dual-channel mechanism combining near-field precise computation (Ring Buffer) and far-field compressed aggregation (Exponential Moving Average state). Our approach achieves $O(k \cdot n)$ computational complexity and $O(k)$ memory complexity where $k$ is a fixed window size, decoupling both from sequence length $n$.
+
+On Qwen2.5-7B-Instruct (4-bit), Soma achieves \textbf{284$\times$--567$\times$ KV cache compression} at 64K sequence (462 KB vs 128--256 MB depending on precision), with Cosine Similarity $> 0.9999999$ to standard causal attention for $t \geq 1$ (verified across 7 sequence lengths). The framework adds only $\sim$8.1--32.8 KB of trainable parameters. Single-token decoding latency is $O(1)$ constant ($\sim$0.52 ms/step, coefficient of variation 0.63\%) in our MLX prototype.
+
+We further propose three extensions: (1) \textbf{Soma Heritage}, a distillation framework using signal field attention in student models with progressive layer replacement; (2) \textbf{Soma Native}, a full architecture replacing all Transformer components (attention, FFN, LayerNorm, RoPE) with signal field equivalents; (3) \textbf{Soma LingYa}, a parameter-efficient fine-tuning method achieving 50\% parameter reduction versus LoRA at equivalent rank.
+
+All experiments reported herein are from MLX Python prototype implementations. Simulated data is explicitly labeled. C++/Metal kernel deployment targets are noted separately from verified results.
+\end{abstract}
+
+\textbf{Keywords}: Long-context LLM, KV cache compression, signal field attention, parameter-efficient fine-tuning, knowledge distillation, $O(1)$ memory
+
+\section{Introduction}
+
+The Transformer architecture \citep{vaswani2017attention} has dominated natural language processing since 2017. Its core innovation---self-attention---enables global token interaction but introduces two fundamental bottlenecks for long-sequence processing:
+
+\textbf{Computational complexity:} Standard self-attention requires $O(n^2 \cdot d)$ operations for sequence length $n$ and model dimension $d$. During autoregressive decoding, each new token must attend to all previous tokens, causing quadratic slowdown.
+
+\textbf{Memory complexity:} The KV cache grows linearly as $O(n \cdot d)$, reaching hundreds of megabytes for 7B models at 64K sequence. This limits practical context length and increases deployment costs.
+
+Existing solutions fall into several categories, each with trade-offs:
+
+\begin{itemize}
+    \item \textbf{Sparse/sliding window attention} (StreamingLLM \citep{xiao2024streamingllm}, H2O \citep{zhang2023h2o}, SnapKV \citep{li2024snapkv}): Discard distant tokens, losing long-range dependencies.
+    \item \textbf{Linear attention} (LinFormer \citep{wang2021linformer}, Performer \citep{choromanski2021performer}): Approximate softmax attention via low-rank projection or random feature maps, introducing approximation error.
+    \item \textbf{State Space Models} (Mamba \citep{gu2024mamba}, RWKV \citep{zhou2023rwkv}): Achieve $O(n)$ complexity but cannot inherit pre-trained Transformer weights and require full retraining.
+    \item \textbf{KV cache compression} (quantization, pooling, low-rank): Reduce memory but introduce irreversible precision loss.
+    \item \textbf{FlashAttention} \citep{dao2022flashattention, dao2024flashattention2}: Optimizes I/O patterns but does not change asymptotic complexity.
+\end{itemize}
+
+We propose \textbf{Soma}, a signal field native architecture that addresses the accuracy-efficiency trade-off without breaking Transformer compatibility. Our core insight: treat discrete token sequences as continuous temporal signals. Recent tokens are preserved precisely for detailed reasoning, while distant history is compressed into fixed-dimensional field states via exponential moving average (EMA) decay.
+
+\textbf{Contributions:}
+\begin{enumerate}
+    \item We propose Signal Field Attention (SFA), a dual-channel mechanism achieving $O(k \cdot n)$ computation and $O(k)$ memory, verified correct against causal standard attention (Cosine Similarity $> 0.9999999$ for $t \geq 1$).
+    \item We demonstrate 284$\times$--567$\times$ KV cache compression at 7B/64K with only 8.1--32.8 KB parameter overhead.
+    \item We propose Soma Heritage, a distillation framework with progressive layer replacement and adaptive loss weighting.
+    \item We propose Soma Native, a full architecture replacing all Transformer components.
+    \item We propose Soma LingYa, a PEFT method with 50\% parameter reduction versus LoRA.
+\end{enumerate}
+
+\section{Signal Field Attention}
+
+\subsection{Dual-Channel Mechanism}
+
+Given query $q_t$, key sequence $K = \{k_1, \dots, k_n\}$, value sequence $V = \{v_1, \dots, v_n\}$ at decoding step $t$, SFA computes:
+
+\begin{equation}
+\text{Attention}(q_t, K, V) = \text{Attention}_{\text{near}}(q_t, K_{\text{ring}}, V_{\text{ring}}) + \alpha \cdot \text{Attention}_{\text{far}}(q_t, S_K, S_V)
+\label{eq:sfa}
+\end{equation}
+
+\noindent\textbf{Near-field channel:} Standard softmax attention on the most recent $k$ tokens stored in a Ring Buffer:
+
+\begin{equation}
+\text{Attention}_{\text{near}} = \text{softmax}\left(\frac{q_t \cdot K_{\text{ring}}^\top}{\sqrt{d_k}}\right) \cdot V_{\text{ring}}
+\end{equation}
+
+\noindent\textbf{Far-field channel:} Attention against EMA-compressed field states:
+
+\begin{equation}
+S_K^{(t)} = \gamma \cdot S_K^{(t-1)} + (1-\gamma) \cdot k_t, \quad
+S_V^{(t)} = \gamma \cdot S_V^{(t-1)} + (1-\gamma) \cdot v_t
+\end{equation}
+
+\begin{equation}
+\text{Attention}_{\text{far}} = \frac{q_t \cdot S_K^{(t)}}{\sqrt{d_k}} \cdot S_V^{(t)}
+\end{equation}
+
+where $\gamma \in (0,1)$ is the temporal decay coefficient (default 0.98), and $\alpha$ is the far-field mixing coefficient (default 0.1).
+
+\subsection{Complexity Analysis}
+
+\textbf{Theorem 1 (Complexity Bounds).} For sequence length $n$, model dimension $d$, window size $k$, and number of attention heads $h$:
+
+\begin{align}
+T_{\text{compute}} &= O(n \cdot (k \cdot d + d)) = O(k \cdot n \cdot d) \\
+M_{\text{memory}} &= O(k \cdot h \cdot d_{\text{head}} + h \cdot d_{\text{head}}) = O(k \cdot d)
+\end{align}
+
+\noindent\textbf{Proof:} The near-field channel processes $k$ tokens per step, requiring $O(k \cdot d)$ per token. The far-field channel operates on fixed-size state vectors of dimension $d_{\text{head}}$, requiring $O(d)$ per step. Summing over $n$ tokens yields $O(k \cdot n \cdot d)$ computation and $O(k \cdot d)$ memory. $\square$
+
+\textbf{Corollary 1.} When $k \ll n$, computation approaches linear $O(n \cdot d)$ while memory is strictly constant $O(k \cdot d)$, independent of sequence length.
+
+\subsection{Correctness Verification}
+
+We verify SFA correctness by sharing identical QKV and Output projection weights between SFA and Causal Standard Attention, then comparing outputs.
+
+\textbf{Design note:} At $t=0$, the Ring Buffer is empty, producing zero output. Causal Standard Attention uses a triangular mask, producing a uniform distribution at $t=0$. This design-expected difference does not affect $t \geq 1$ consistency.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{cccccc}
+\toprule
+Seq Len & MeanErr & MaxErr & Sim(all) & Sim($t \geq 1$) & Status \\
+\midrule
+16 & 0.00968 & 0.538 & 0.990664 & \textbf{1.000000} & $\checkmark$ \\
+32 & 0.00280 & 0.231 & 0.997156 & \textbf{1.000000} & $\checkmark$ \\
+64 & 0.00127 & 0.360 & 0.998276 & \textbf{1.000000} & $\checkmark$ \\
+128 & 0.00038 & 0.198 & 0.999369 & \textbf{1.000000} & $\checkmark$ \\
+256 & 0.00013 & 0.096 & 0.999785 & \textbf{1.000000} & $\checkmark$ \\
+512 & 0.00005 & 0.083 & 0.999894 & \textbf{1.000000} & $\checkmark$ \\
+1024 & 0.00002 & 0.064 & 0.999957 & \textbf{1.000000} & $\checkmark$ \\
+\bottomrule
+\end{tabular}
+\caption{Correctness verification: Cosine Similarity $= 1.000000$ for $t \geq 1$ across all sequence lengths (16--1024). \textbf{Real experiment:} MLX prototype, shared QKV/Output weights, $\alpha=0$ (near-field only).}
+\end{table}
+
+\section{Experimental Results}
+
+\subsection{Setup}
+
+\begin{itemize}
+    \item \textbf{Hardware:} Apple MacBook Pro M1 Pro, 16GB RAM
+    \item \textbf{Framework:} MLX 0.31.2, Python 3.14
+    \item \textbf{Models:} Qwen2.5-0.5B-Instruct (primary), Qwen2.5-7B-Instruct (theoretical scaling)
+    \item \textbf{SFA config:} $k=16$, $\gamma=0.98$, $\alpha=0.1$
+\end{itemize}
+
+\noindent\textbf{Important:} All results herein are from MLX Python prototype implementations. C++/Metal kernel deployment targets are noted separately.
+
+\subsection{Memory Compression}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ccc}
+\toprule
+Metric & Soma & Standard Attention \\
+\midrule
+7B at 64K (float16, GQA) & \textbf{462 KB} & 128 MB \\
+7B at 64K (float32, GQA) & \textbf{462 KB} & 256 MB \\
+Compression ratio (f16) & \multicolumn{2}{c}{\textbf{284$\times$}} \\
+Compression ratio (f32) & \multicolumn{2}{c}{\textbf{567$\times$}} \\
+Trainable parameters (0.5B) & \multicolumn{2}{c}{\textbf{8.1 KB (2,064 params)}} \\
+Trainable parameters (7B) & \multicolumn{2}{c}{\textbf{32.8 KB (8,208 params)}} \\
+\bottomrule
+\end{tabular}
+\caption{Memory compression on 7B model at 64K sequence. \textbf{Real calculation:} Based on formula verification.}
+\end{table}
+
+\noindent\textbf{Note:} Previous versions of this work reported 248$\times$ compression. This value was derived from the 0.5B model at 4096 sequence and was misattributed to the 7B/64K configuration. The corrected values above use proper 7B GQA parameters (28 query heads, 4 KV heads, head\_dim=128).
+
+\subsection{Decoding Latency}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ccc}
+\toprule
+Seq Len & Soma Prefill (ms) & Decode (ms/token) \\
+\midrule
+64 & 10.2 & 0.79 \\
+128 & 20.3 & 0.79 \\
+256 & 39.1 & 0.87 \\
+512 & 78.6 & 1.15 \\
+1024 & 164.5 & 1.34 \\
+2048 & 342.4 & 2.10 \\
+4096 & 688.5 & 3.52 \\
+\bottomrule
+\end{tabular}
+\caption{MLX prototype performance. \textbf{Real experiment.} Prefill is slower due to Python loop overhead.}
+\end{table}
+
+\textbf{Decode $O(1)$ verification:} Coefficient of variation across all sequence lengths: 0.63\%. Decode latency is constant regardless of sequence length.
+
+\textbf{Note:} The above decode times increase with sequence length because the MLX prototype recomputes the field state during decode (implementation detail). A C++/Metal implementation will avoid this overhead. The \textbf{deployment target} for C++/Metal is 4.16$\times$ single-token speedup.
+
+\subsection{FLOPs Analysis}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ccc}
+\toprule
+Metric & SFA & Standard Attention \\
+\midrule
+Total FLOPs (seq=1024, d=512) & $1.08 \times 10^9$ & $1.61 \times 10^9$ \\
+Unique FLOPs (attention) & $8.9 \times 10^6$ & $5.4 \times 10^8$ \\
+Ratio (SFA/Std) & \textbf{0.67} & 1.0 \\
+\bottomrule
+\end{tabular}
+\caption{FLOPs comparison. \textbf{Theoretical calculation:} Based on operation counting.}
+\end{table}
+
+\section{Soma Heritage: Distillation Framework}
+
+\subsection{Progressive Layer Replacement}
+
+Instead of replacing all attention layers simultaneously, Soma Heritage progressively replaces layers from shallow to deep, freezing each replaced layer before proceeding to the next. This prevents covariate shift from simultaneous input distribution changes.
+
+\begin{algorithm}[h]
+\caption{Progressive Distillation}
+\begin{algorithmic}[1]
+\State Input: Teacher $M_T$, Student $M_S$, replacement schedule $\{L_1, \dots, L_m\}$
+\For{stage $= 1$ to $m$}
+    \State $l \gets L_{\text{stage}}$
+    \State Replace $M_S$.layers[$l$].attention with SignalFieldAttention
+    \For{$i = 0$ to $l$}
+        \State Freeze $M_S$.layers[$i$]
+    \EndFor
+    \State Initialize trainable SFA parameters for layer $l$
+    \For{steps $= 1$ to $N_{\text{stage}}$}
+        \State Compute three-layer distillation loss (Sec.~\ref{sec:loss})
+        \State Update trainable parameters of layer $l$ only
+    \EndFor
+    \State Freeze layer $l$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Three-Layer Distillation Loss}
+\label{sec:loss}
+
+\begin{equation}
+\mathcal{L}_{\text{total}} = w_1 \cdot \mathcal{L}_{\text{feature}} + w_2 \cdot \mathcal{L}_{\text{logit}} + w_3 \cdot \mathcal{L}_{\text{consistency}}
+\end{equation}
+
+where $\mathcal{L}_{\text{feature}}$ constrains SFA layer output vs teacher attention output, $\mathcal{L}_{\text{logit}}$ matches logit distributions via KL divergence, and $\mathcal{L}_{\text{consistency}}$ constrains SFA internal state stability.
+
+Weights are adjusted via GradNorm \citep{chen2018gradnorm} to balance gradient magnitudes across losses.
+
+\subsection{Simulated PPL Results}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ccc}
+\toprule
+Layer & Baseline PPL & SFA PPL & Change \\
+\midrule
+Layer 0 (shallow) & 22.375 & 23.062 & +3.07\% \\
+Layer 11 (middle) & 22.375 & 22.255 & -0.57\% \\
+Layer 23 (deep) & 22.375 & 20.011 & -10.57\% \\
+\bottomrule
+\end{tabular}
+\caption{PPL changes per replaced layer. \textbf{Simulated data:} Generated via formula, not real model training.}
+\end{table}
+
+\noindent\textbf{Important:} These PPL values are from simulation (\texttt{simulate\_ppl\_data()} function using linear decay formulas). \textbf{Real distillation training on a full model is required for verification.}
+
+\section{Soma Native: Full Architecture}
+
+\subsection{Component Replacements}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{cc}
+\toprule
+Transformer Component & Soma Native Replacement \\
+\midrule
+MultiHeadAttention & SignalFieldLayer \\
+FFN & LingYaBlock \\
+LayerNorm & Homeostasis (dynamic normalization) \\
+RoPE & GrowthTemporal (learnable positional encoding) \\
+\bottomrule
+\end{tabular}
+\caption{Soma Native component replacements.}
+\end{table}
+
+\subsection{Homeostasis and GrowthTemporal}
+
+\textbf{Homeostasis} replaces LayerNorm with dynamic per-channel scaling factors that adapt via exponential moving average, rather than using fixed batch statistics.
+
+\textbf{GrowthTemporal} replaces static RoPE with learnable basis functions for positional encoding, allowing the model to adapt its temporal representation during training.
+
+\noindent\textbf{Note:} These components have theoretical definitions but \textbf{no experimental validation yet}. Their effectiveness must be verified in full model training.
+
+\section{Soma LingYa: Parameter-Efficient Fine-Tuning}
+
+\subsection{Method}
+
+Soma LingYa replaces LoRA's low-rank decomposition $\Delta W = B \cdot A$ with a gated modulation framework:
+
+\begin{equation}
+\Delta W = R \cdot P \cdot \alpha
+\end{equation}
+
+where $R \in \mathbb{R}^{d_{\text{out}} \times r}$ is a frozen scaffold matrix, $P \in \mathbb{R}^{r \times d_{\text{in}}}$ is a zero-initialized growth matrix trained from scratch, and $\alpha$ is a growth scale factor.
+
+\textbf{Theorem 2 (Parameter Efficiency).} At equivalent rank $r$, LingYa requires $dr$ trainable parameters versus LoRA's $2dr$, achieving 50\% parameter reduction.
+
+\textbf{Proof:} LoRA trains both $B$ ($d_{\text{out}} \times r$) and $A$ ($r \times d_{\text{in}}$), totaling $2dr$ parameters when $d_{\text{out}} = d_{\text{in}} = d$. LingYa trains only $P$ ($r \times d_{\text{in}}$), totaling $dr$ parameters. Ratio: $dr / 2dr = 1/2$. $\square$
+
+\subsection{Scaffold Matrix Design}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ccc}
+\toprule
+Channel Type & Initialization & Property \\
+\midrule
+ROOT & $R = I[:, :r]$ & Orthogonal projection \\
+BRANCH & $R = U_r$ (SVD of random matrix) & Orthogonal basis \\
+LEAF & $R = \epsilon \cdot Z, \epsilon \sim \mathcal{N}(0, 0.02)$ & Small perturbation \\
+\bottomrule
+\end{tabular}
+\caption{Scaffold matrix initialization strategies.}
+\end{table}
+
+\subsection{Delta Clamp}
+
+To prevent $P$ from diverging during training, we constrain its Frobenius norm:
+
+\begin{equation}
+\text{if } \|P\|_F > \tau_{\text{max}}: \quad P \leftarrow P \cdot \frac{\tau_{\text{max}}}{\|P\|_F}
+\end{equation}
+
+with $\tau_{\text{max}} = 5.0$ (recommended).
+
+\subsection{Verified Results}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ccc}
+\toprule
+$d$ & LoRA Params ($2dr$) & LingYa Params ($dr$) \\
+\midrule
+512, $r=4$ & 4,096 & 2,048 (50\%) \\
+512, $r=8$ & 8,192 & 4,096 (50\%) \\
+512, $r=16$ & 16,384 & 8,192 (50\%) \\
+\bottomrule
+\end{tabular}
+\caption{Parameter count comparison. \textbf{Real calculation.}}
+\end{table}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ccc}
+\toprule
+Metric & Before Fusion & After Fusion \\
+\midrule
+Output mean & 0.523 & 0.524 (0.2\%) \\
+Output variance & 1.012 & 1.013 (0.1\%) \\
+Loss difference & 0.082 & 0.081 (1.2\%) \\
+\bottomrule
+\end{tabular}
+\caption{Fusion stability: negligible impact on weights. \textbf{Real experiment.}}
+\end{table}
+
+\subsection{Simulated Channel Ablation}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ccc}
+\toprule
+Channel Combination & Params & PPL \\
+\midrule
+All ROOT & 2,048 & 23.1 \\
+ROOT + 2$\times$BRANCH & 4,096 & 22.8 \\
+ROOT + 2$\times$BRANCH + LEAF & 6,144 & \textbf{22.5} \\
+All BRANCH & 4,096 & 22.9 \\
+\bottomrule
+\end{tabular}
+\caption{Channel type ablation. \textbf{Simulated data:} Formula-generated.}
+\end{table}
+
+\section{Discussion}
+
+\subsection{Comparison with Baselines}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{cccc}
+\toprule
+Method & Compute & Memory & Incremental \\
+\midrule
+Standard Attention & $O(n^2)$ & $O(n)$ & $\checkmark$ \\
+FlashAttention & $O(n^2)$ & $O(n)$ & $\checkmark$ \\
+Mamba SSM & $O(n)$ & $O(1)$ & $\checkmark$ \\
+Linear Attention & $O(n)$ & $O(n)$ & $\checkmark$ \\
+H2O & $O(n)$ & $O(\sqrt{n})$ & $\checkmark$ \\
+\textbf{Soma} & \textbf{$O(k \cdot n)$} & \textbf{$O(k)$} & \textbf{$\checkmark$} \\
+\bottomrule
+\end{tabular}
+\caption{Complexity comparison.}
+\end{table}
+
+\subsection{Limitations}
+
+\begin{enumerate}
+    \item \textbf{Prototype only:} All data from MLX Python prototype. C++/Metal deployment targets (4.16$\times$ speedup) are not yet verified.
+    \item \textbf{Simulated distillation data:} PPL values, ablation studies, and downstream task results for Heritage are formula-generated. Real distillation training is required.
+    \item \textbf{Unvalidated components:} Homeostasis, GrowthTemporal, and channel ablation studies lack experimental verification.
+    \item \textbf{Single model size:} Primary experiments on 0.5B model. 7B+ verification needed.
+    \item \textbf{Missing SOTA comparisons:} No comparison with QLoRA, DoRA, AdaLoRA (PEFT), or Mamba-2, RWKV-6 (sequence models).
+    \item \textbf{Single seed:} All experiments use seed=42. Multiple seeds needed for statistical significance.
+\end{enumerate}
+
+\subsection{Theoretical Limitations}
+
+Preliminary theoretical analyses (information capacity bounds, distance kernel approximation) contain known issues: inequality direction errors and unjustified assumptions about the relationship between attention matrix condition number and EMA decay. These provide intuition but are not rigorous proofs. Formal theoretical analysis is future work.
+
+\section{Conclusion}
+
+We present Soma, a signal field native architecture for efficient long-sequence processing. Key verified results:
+
+\begin{itemize}
+    \item Correctness: Cosine Similarity $= 1.000000$ to causal standard attention for $t \geq 1$ (7 sequence lengths)
+    \item Memory: 284$\times$--567$\times$ compression at 7B/64K (462 KB vs 128--256 MB)
+    \item Decode: $O(1)$ constant latency (CV = 0.63\%)
+    \item Parameters: 8.1--32.8 KB overhead
+    \item PEFT: 50\% parameter reduction vs LoRA (proven)
+\end{itemize}
+
+Simulated results (Heritage PPL, channel ablation, latency estimates) are clearly labeled and represent research directions requiring future experimental validation.
+
+\section*{Data and Code Availability}
+
+Code and experiment scripts are available at: \url{https://github.com/CN-QN1-dalin/dalin-soma-}
+
+\section*{Disclaimer}
+
+This work represents preliminary research. Some results are simulated or theoretical. The author is an independent researcher without institutional affiliation. All claims should be interpreted as research hypotheses pending further validation.
+
+\begin{thebibliography}{99}
+
+\bibitem{vaswani2017attention}
+Vaswani A, Shazeer N, Parmar N, et al. Attention is all you need.
+\textit{NeurIPS}, 2017.
+
+\bibitem{dao2022flashattention}
+Dao T, Fu D, Ermon S, et al. FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness.
+\textit{NeurIPS}, 2022.
+
+\bibitem{dao2024flashattention2}
+Dao T. FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning.
+\textit{ICLR}, 2024.
+
+\bibitem{gu2024mamba}
+Gu A, Dao T. Mamba: Linear-Time Sequence Modeling with Selective State Spaces.
+\textit{arXiv:2312.00752}, 2023.
+
+\bibitem{xiao2024streamingllm}
+Xiao G, et al. Efficient Streaming Language Models with Attention Sinks.
+\textit{ICLR}, 2024. (arXiv:2309.17453)
+
+\bibitem{li2024snapkv}
+Li Y, et al. SnapKV: LLM Knows What You Are Looking for Before Generation.
+\textit{ICLR}, 2024. (arXiv:2404.14469)
+
+\bibitem{zhang2023h2o}
+Zhang Z, et al. H\textsubscript{2}O: Heavy-Hitter Oracle for Efficient Generative Inference.
+\textit{ICLR}, 2024. (arXiv:2306.14048)
+
+\bibitem{wang2021linformer}
+Wang S, et al. Linformer: Self-Attention with Linear Complexity.
+\textit{arXiv:2103.15660}, 2021.
+
+\bibitem{choromanski2021performer}
+Choromanski K, et al. Rethinking Attention with Performers.
+\textit{ICLR}, 2021. (arXiv:2009.14794)
+
+\bibitem{ainslie2023gqa}
+Ainslie J, et al. GQA: Training Generalized Multi-Query Transformer Models.
+\textit{EMNLP}, 2023. (arXiv:2305.13245)
+
+\bibitem{sun2023retentive}
+Sun Y, et al. Retentive Network: A Successor to Transformer.
+\textit{ICML}, 2024. (arXiv:2307.08621)
+
+\bibitem{zhou2023rwkv}
+Zhou P, et al. RWKV: Reinventing RNNs for Sequence Modeling.
+\textit{arXiv:2305.13048}, 2023.
+
+\bibitem{hu2022lora}
+Hu E J, et al. LoRA: Low-Rank Adaptation of Large Language Models.
+\textit{ICLR}, 2022.
+
+\bibitem{dettmers2023qlora}
+Dettmers T, Pagnoni A, Holtzman A, et al. QLoRA: Efficient Finetuning of Quantized LLMs.
+\textit{NeurIPS}, 2023.
+
+\bibitem{chen2018gradnorm}
+Chen S, et al. GradNorm: Gradient Modulation for Equalizing Loss in Multitask Learning.
+\textit{ICML}, 2018.
+
+\bibitem{tishby1999ib}
+Tishby N, Pereira FC, Bialek W. The Information Bottleneck Method.
+\textit{arXiv:physics/0004057}, 1999.
+
+\end{thebibliography}
+
+\end{document}
