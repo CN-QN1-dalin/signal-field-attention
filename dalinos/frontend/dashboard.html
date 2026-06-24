@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DalinOS — 意识面板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .pulse-dot {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .live-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            margin-right: 6px;
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- Header -->
+    <header class="border-b border-gray-700 bg-gray-800/50 backdrop-blur-sm sticky top-0 z-50">
+        <div class="container mx-auto px-4 md:px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <span class="text-2xl">🌌</span>
+                <h1 class="text-xl font-bold text-purple-400">DalinOS</h1>
+                <span class="text-xs bg-purple-600 px-2 py-0.5 rounded">意识面板</span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-400"><span class="live-indicator"></span>实时监控中</span>
+                <a href="/" class="text-gray-300 hover:text-white">← 返回首页</a>
+                <div class="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-sm">👤</div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 md:px-6 py-6">
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="glass-card p-4 rounded-xl">
+                <div class="text-gray-400 text-xs">活跃 Agent</div>
+                <div class="text-2xl font-bold text-green-400" id="active-agents">3</div>
+            </div>
+            <div class="glass-card p-4 rounded-xl">
+                <div class="text-gray-400 text-xs">总 Token 消耗</div>
+                <div class="text-2xl font-bold text-blue-400" id="total-tokens">12,450</div>
+            </div>
+            <div class="glass-card p-4 rounded-xl">
+                <div class="text-gray-400 text-xs">内存使用</div>
+                <div class="text-2xl font-bold text-yellow-400" id="memory-usage">256 MB</div>
+            </div>
+            <div class="glass-card p-4 rounded-xl">
+                <div class="text-gray-400 text-xs">钱包余额</div>
+                <div class="text-2xl font-bold text-purple-400" id="wallet-balance">¥100.00</div>
+            </div>
+        </div>
+
+        <!-- Agent List -->
+        <div class="mb-6">
+            <h2 class="text-lg font-bold mb-4 flex items-center">
+                <span class="live-indicator"></span>Agent 实时状态
+            </h2>
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4" id="agent-list">
+                <!-- Agent cards will be populated by JS -->
+            </div>
+        </div>
+
+        <!-- Token Economy -->
+        <div class="mb-6">
+            <h2 class="text-lg font-bold mb-4">Token 交易记录</h2>
+            <div class="glass-card rounded-xl overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-800">
+                        <tr>
+                            <th class="px-4 py-2 text-left">类型</th>
+                            <th class="px-4 py-2 text-left">金额</th>
+                            <th class="px-4 py-2 text-left">时间</th>
+                            <th class="px-4 py-2 text-left">状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transaction-table">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Activity Log -->
+        <div>
+            <h2 class="text-lg font-bold mb-4">活动日志</h2>
+            <div class="glass-card rounded-xl p-4 max-h-64 overflow-y-auto" id="activity-log">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock data
+        const agents = [
+            { id: 1, name: 'Code Assistant', status: 'running', task: '生成 API 文档', tokens: 4500, memory: 128, cpu: 45 },
+            { id: 2, name: 'Data Analyzer', status: 'idle', task: '等待任务', tokens: 3200, memory: 64, cpu: 0 },
+            { id: 3, name: 'Content Creator', status: 'running', task: '撰写营销文案', tokens: 4750, memory: 64, cpu: 30 },
+        ];
+
+        const transactions = [
+            { type: 'agent_purchase', amount: '-¥10.00', time: '2026-06-24 18:00', status: 'completed' },
+            { type: 'platform_reward', amount: '+¥5.00', time: '2026-06-24 17:30', status: 'completed' },
+            { type: 'agent_download', amount: '-¥2.00', time: '2026-06-24 16:00', status: 'completed' },
+        ];
+
+        const activities = [
+            'Code Assistant 开始生成 API 文档',
+            'Data Analyzer 进入空闲状态',
+            'Content Creator 开始撰写营销文案',
+            '用户 dalinos 登录系统',
+        ];
+
+        // Render agents
+        function renderAgents() {
+            const container = document.getElementById('agent-list');
+            container.innerHTML = agents.map(agent => `
+                <div class="glass-card p-4 rounded-xl">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="font-bold">${agent.name}</h3>
+                        <span class="px-2 py-0.5 rounded text-xs ${agent.status === 'running' ? 'bg-green-600' : 'bg-gray-600'}">
+                            ${agent.status === 'running' ? '运行中' : '空闲'}
+                        </span>
+                    </div>
+                    <p class="text-gray-400 text-sm mb-2">${agent.task}</p>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div>Token: ${agent.tokens.toLocaleString()}</div>
+                        <div>内存: ${agent.memory} MB</div>
+                        <div>CPU: ${agent.cpu}%</div>
+                        <div>ID: #${agent.id}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Render transactions
+        function renderTransactions() {
+            const tbody = document.getElementById('transaction-table');
+            tbody.innerHTML = transactions.map(tx => `
+                <tr class="border-t border-gray-700">
+                    <td class="px-4 py-2">${tx.type}</td>
+                    <td class="px-4 py-2 ${tx.amount.startsWith('+') ? 'text-green-400' : 'text-red-400'}">${tx.amount}</td>
+                    <td class="px-4 py-2 text-gray-400">${tx.time}</td>
+                    <td class="px-4 py-2"><span class="text-green-400">✓ 完成</span></td>
+                </tr>
+            `).join('');
+        }
+
+        // Render activity log
+        function renderActivityLog() {
+            const container = document.getElementById('activity-log');
+            container.innerHTML = activities.map(act => `
+                <div class="text-sm text-gray-300 py-1 border-b border-gray-700">${act}</div>
+            `).join('');
+        }
+
+        // Initialize
+        renderAgents();
+        renderTransactions();
+        renderActivityLog();
+
+        // Simulate real-time updates
+        setInterval(() => {
+            const activeCount = agents.filter(a => a.status === 'running').length;
+            document.getElementById('active-agents').textContent = activeCount;
+        }, 5000);
+    </script>
+</body>
+</html>
