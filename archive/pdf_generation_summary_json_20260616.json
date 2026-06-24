@@ -1,0 +1,7 @@
+{
+  "answer": "## PDF 生成完整过程总结\n\n### 时间线\n\n**昨天（6月15日）**：使用 fpdf2 首次生成 SFA_Technical_Paper.pdf（6页），基本成功。\n\n**今天（6月16日）分三个阶段：**\n\n**阶段一（12:23-12:53）**：尝试生成双语 PDF，遭遇 fpdf2 核心字体 CJK 编码错误（UnicodeEncodeError），DejaVu Sans 也不支持中文，wkhtmltopdf 和 pandoc 环境不可用。决定彻底转向 Playwright HTML-to-PDF 方案。\n\n**阶段二（12:53-13:39）**：创建 generate_soma_pdfs.py，采用 Playwright 管线。但混合中英文内容导致 CJK 泄漏到 PDF。实施激进英文提取过滤器：表格行从括号提取英文，段落用 CJK 比例阈值（中文>60%则过滤），摘要块修正 blockquote 解析顺序。\n\n**阶段三（13:39-14:07）**：Notes/Disclaimers 仍泄漏到 Abstract，修正脚本第 212 行逻辑。最终成功生成 6 个 PDF 文件。\n\n### 主要问题与解决方案\n\n1. **fpdf2 CJK 编码错误** → 放弃 fpdf2，改用 Playwright\n2. **字体方案均失败** → 彻底切换方案而非修补\n3. **外部工具不可用** → Playwright 作为浏览器级替代\n4. **CJK 泄漏** → 英文提取过滤器（比例阈值+括号提取）\n5. **Abstract 元数据混入** → 严格 blockquote 解析顺序控制\n\n### 关键经验教训\n\n- fpdf2 不适合 CJK 场景（除非配置复杂字体嵌入）\n- Playwright HTML-to-PDF 是可靠的浏览器级替代方案\n- 英文提取比中英混合排版更高效\n- blockquote 解析需严格顺序控制\n\n### 剩余问题\n- 数学公式仍为原始 LaTeX 字符串\n- 代码块中有中文标签\n- 标题页格式不一致",
+  "citedIds": ["sum_0a926e662e2a8fc3", "sum_16395a812c04125f", "sum_299a79193bcaabef", "sum_65fdd25060d70a90", "sum_e6c0f67505a970aa"],
+  "expandedSummaryCount": 6,
+  "totalSourceTokens": 953,
+  "truncated": false
+}

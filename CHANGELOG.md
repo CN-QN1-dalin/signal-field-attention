@@ -1,30 +1,44 @@
-# Changelog
+# Dalin L 变更日志
 
-All notable changes to this project will be documented in this file.
+所有重要更改都将记录在此文件中。
 
-## [Unreleased] - 2026-06-23
+格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
+项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-### Added
-- SFA v7 integration test suite (`test_sfa_integration.py`)
-- Orthogonality correctness test (`test_sfa_correctness.py`)
-- Metal GPU kernel (`src/sfa/sfa_kernel.metal`)
-- C++ bridge layer (`src/sfa/sfa_llama_bridge.cpp`)
-- Universal adapter pattern for llama.cpp integration (`src/sfa/sfa_llama_cpp.cpp`)
-- Integration guide (`docs/INTEGRATION_GUIDE.md`)
-- LLaMA.cpp integration checklist (`docs/LLAMA_CPP_INTEGRATION_CHECKLIST.md`)
+## [未发布]
 
-### Changed
-- Calibrated SFA constants: ALPHA_BASE=0.1, ENHANCEMENT_CLIP=0.5, CROSS_DECAY=0.8
-- Replaced `ggml_new_i32` with `ggml_new_tensor_1d + ggml_set_f32` for API compliance
-- Fixed field_state tensor shape handling in `build_sfa_enhance`
-- Implemented proper sequence lifecycle hooks (seq_cp/seq_rm)
+### 添加
+- 词法分析器
+- 语法分析器
+- 类型系统（HM）
+- 代码生成（LLVM）
+- 标准库
+- CLI + REPL
+- 中文支持
 
-### Fixed
-- Removed hardcoded paths (`/tmp/llama.cpp/ggml/include/ggml.h`)
-- Resolved stale constant values in `sfa_lockfree.h`
-- Thread safety improvements in global state management
+### 修复
+- 无
 
-### Test Results
-- Qwen2.5-0.5B: Orthogonality cosine ≈ 0.0 (target < 0.1)
-- Memory compression: 248x at seq=4096, 3972x at seq=65536
-- Enhancement ratio: ~3.3% of attention output
+### 变更
+- 无
+
+## [0.1.0] - 2026-06-24
+
+### 添加
+- 词法分析器（25 个关键字）
+- 语法分析器（递归下降）
+- 类型系统（Hindley-Milner）
+- 代码生成（LLVM IR）
+- 标准库（collections, io, string, option, result, iterator）
+- CLI（build, run, test, repl, fmt, docs）
+- REPL（交互式开发）
+- 中文支持（变量名、函数名、注释、错误信息）
+- 五方辩论共识引擎
+- Agent 特性（自我修复、自动测试、统一 FFI）
+- 包管理器
+- VSCode 插件
+- 文档站点
+- 社区建设
+
+[未发布]: https://github.com/CN-QN1-dalin/dalin-l/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/CN-QN1-dalin/dalin-l/releases/tag/v0.1.0
