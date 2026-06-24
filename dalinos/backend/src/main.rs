@@ -274,7 +274,15 @@ async fn login(
     .ok_or((StatusCode::UNAUTHORIZED, "Invalid email or password".to_string()))?;
     
     // 验证密码
-    let password_valid = verify_password(&req.password, &user.role) // 这里应该用 password_hash 字段
+    let password_hash: String = sqlx::query_scalar(
+        "SELECT password_hash FROM users WHERE email = $1"
+    )
+    .bind(&req.email)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    
+    let password_valid = verify_password(&req.password, &password_hash)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     
     if !password_valid {
@@ -302,20 +310,48 @@ async fn refresh_token(
     State(state): State<AppState>,
     JsonReq(req): JsonReq<RefreshTokenRequest>,
 ) -> Result<Json<LoginResponse>, (StatusCode, String)> {
-    // TODO: 验证 refresh token
-    // TODO: 生成新的 access token
+    let pool = &state.pool;
+    
+    // 验证 refresh token 是否存在于数据库
+    let user_id: (Uuid,) = sqlx::query_scalar(
+        "SELECT user_id FROM refresh_tokens WHERE token = $1 AND expires_at > NOW()"
+    )
+    .bind(&req.refresh_token)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .ok_or((StatusCode::UNAUTHORIZED, "Invalid or expired refresh token".to_string()))?;
+    
+    // 获取用户信息
+    let user: User = sqlx::query_as::<_, User>(r#"
+        SELECT id, username, email, avatar_url, role, created_at
+        FROM users WHERE id = $1
+    "#)
+    .bind(user_id.0)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    
+    // 生成新 token 对
+    let access_token = generate_access_token(user.id, &user.username, &user.role)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    
+    let new_refresh_token = generate_refresh_token(user.id)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    
+    // 更新数据库中的 refresh token
+    sqlx::query(
+        "UPDATE refresh_tokens SET revoked = true WHERE user_id = $1"
+    )
+    .bind(user.id)
+    .execute(pool)
+    .await
+    .ok();
     
     Ok(Json(LoginResponse {
-        access_token: "new_access_token".to_string(),
-        refresh_token: req.refresh_token,
-        user: User {
-            id: Uuid::nil(),
-            username: "user".to_string(),
-            email: "user@example.com".to_string(),
-            avatar_url: None,
-            role: "user".to_string(),
-            created_at: chrono::Utc::now(),
-        },
+        access_token,
+        refresh_token: new_refresh_token,
+        user,
     }))
 }
 
@@ -572,6 +608,26 @@ async fn create_review(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     
+    // 更新 Agent 的平均评分
+    sqlx::query(r#"
+        UPDATE agents 
+        SET rating = (
+            SELECT AVG(rating)::float 
+            FROM reviews 
+            WHERE agent_id = $1
+        ),
+        rating_count = (
+            SELECT COUNT(*) 
+            FROM reviews 
+            WHERE agent_id = $1
+        )
+        WHERE id = $1
+    "#)
+    .bind(agent_id.0)
+    .execute(pool)
+    .await
+    .ok();
+    
     Ok((StatusCode::CREATED, Json(review)))
 }
 
@@ -618,30 +674,16 @@ async fn compile_code(
     claims: Claims,
     JsonReq(req): JsonReq<CompileRequest>,
 ) -> Json<CompileResponse> {
-    // TODO: 集成真实的 Dalin L 编译器
-    
-    let has_error = req.code.contains("error") || req.code.contains("ERROR");
-    let has_warning = req.code.contains("warning") || req.code.contains("WARNING");
-    
-    if has_error {
-        Json(CompileResponse {
+    // 集成真实的 Dalin L 编译器
+    match crate::compiler::compile_dalin_l(&req.code, &req.version) {
+        Ok(result) => Json(result),
+        Err(e) => Json(CompileResponse {
             success: false,
             output: String::new(),
-            errors: vec!["Syntax error: unexpected token".to_string()],
-            warnings: if has_warning { vec!["Consider using type annotations".to_string()] } else { vec![] },
-            suggestions: vec![
-                "Check variable types".to_string(),
-                "Use 'let' for immutable bindings".to_string(),
-            ],
-        })
-    } else {
-        Json(CompileResponse {
-            success: true,
-            output: "Compilation successful!\nOutput: Hello, DalinOS!".to_string(),
-            errors: vec![],
+            errors: vec![e],
             warnings: vec![],
-            suggestions: vec![],
-        })
+            suggestions: vec!["Check syntax and types".to_string()],
+        }),
     }
 }
 
@@ -743,7 +785,16 @@ async fn main() {
         .init();
     
     let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://dalinos:dalinos_password@localhost:5432/dalinos".to_string());
+        .unwrap_or_else(|_| {
+            let db_host = std::env::var("DB_HOST").unwrap_or_else(|_| "localhost".to_string());
+            let db_port = std::env::var("DB_PORT").unwrap_or_else(|_| "5432".to_string());
+            let db_name = std::env::var("DB_NAME").unwrap_or_else(|_| "dalinos".to_string());
+            let db_user = std::env::var("DB_USER").unwrap_or_else(|_| "dalinos".to_string());
+            let db_pass = std::env::var("DB_PASS").unwrap_or_else(|_| {
+                uuid::Uuid::new_v4().simple().to_string()[..16].to_string()
+            });
+            format!("postgresql://{}:{}@{}:{}/{}", db_user, db_pass, db_host, db_port, db_name)
+        });
     
     let pool = PgPool::builder(&database_url)
         .max_connections(20)

@@ -3,6 +3,20 @@
 // 日期: 2026-06-24
 // 状态: MVP v1.0
 
+/// 便捷函数：编译 Dalin L 代码
+pub fn compile_dalin_l(source: &str, _version: &Option<String>) -> super::CompileResponse {
+    let compiler = Compiler::new();
+    let result = compiler.compile(source, CompileOptions::default());
+    
+    super::CompileResponse {
+        success: result.success,
+        output: result.output,
+        errors: result.errors.iter().map(|e| e.message.clone()).collect(),
+        warnings: result.warnings.clone(),
+        suggestions: result.suggestions.clone(),
+    }
+}
+
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 
