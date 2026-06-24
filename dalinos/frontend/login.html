@@ -157,7 +157,9 @@
     </div>
 
     <script>
-        function handleLogin(event) {
+        const API_BASE = 'http://localhost:3000/api/v1';
+
+        async function handleLogin(event) {
             event.preventDefault();
             
             const email = document.getElementById('email').value;
@@ -167,26 +169,46 @@
             const loginText = document.getElementById('loginText');
             const loginSpinner = document.getElementById('loginSpinner');
             
-            // Show loading state
             loginBtn.disabled = true;
             loginText.textContent = '登录中...';
             loginSpinner.classList.remove('hidden');
             errorMessage.classList.add('hidden');
             
-            // Simulate API call
-            setTimeout(() => {
-                // Reset button state
+            try {
+                const res = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await res.json();
+                
+                if (!res.ok) {
+                    errorMessage.textContent = data.detail || '登录失败';
+                    errorMessage.classList.remove('hidden');
+                    document.getElementById('login-form').classList.add('shake');
+                    setTimeout(() => document.getElementById('login-form').classList.remove('shake'), 500);
+                    return;
+                }
+                
+                // Save tokens
+                localStorage.setItem('access_token', data.access_token);
+                localStorage.setItem('refresh_token', data.refresh_token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                
+                alert('登录成功！欢迎回来，' + data.user.username);
+                window.location.href = '/index.html';
+            } catch (err) {
+                errorMessage.textContent = '网络连接失败，请检查后端是否运行';
+                errorMessage.classList.remove('hidden');
+            } finally {
                 loginBtn.disabled = false;
                 loginText.textContent = '登录';
                 loginSpinner.classList.add('hidden');
-                
-                // Simulate success
-                alert('登录成功！跳转到首页...');
-                // window.location.href = '/dashboard';
-            }, 1500);
+            }
         }
         
-        function handleRegister(event) {
+        async function handleRegister(event) {
             event.preventDefault();
             
             const username = document.getElementById('reg-username').value;
@@ -198,38 +220,50 @@
             const registerText = document.getElementById('registerText');
             const registerSpinner = document.getElementById('registerSpinner');
             
-            // Validate passwords match
             if (password !== passwordConfirm) {
                 errorMessage.textContent = '两次输入的密码不一致';
                 errorMessage.classList.remove('hidden');
                 document.getElementById('register-form').classList.add('shake');
-                setTimeout(() => {
-                    document.getElementById('register-form').classList.remove('shake');
-                }, 500);
+                setTimeout(() => document.getElementById('register-form').classList.remove('shake'), 500);
                 return;
             }
             
-            // Show loading state
             registerBtn.disabled = true;
             registerText.textContent = '注册中...';
             registerSpinner.classList.remove('hidden');
             errorMessage.classList.add('hidden');
             
-            // Simulate API call
-            setTimeout(() => {
-                // Reset button state
-                registerBtn.disabled = false;
-                registerText.textContent = '注册';
-                registerSpinner.classList.add('hidden');
+            try {
+                const res = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password, password_confirm: passwordConfirm })
+                });
                 
-                // Simulate success
+                const data = await res.json();
+                
+                if (!res.ok) {
+                    errorMessage.textContent = data.detail || '注册失败';
+                    errorMessage.classList.remove('hidden');
+                    document.getElementById('register-form').classList.add('shake');
+                    setTimeout(() => document.getElementById('register-form').classList.remove('shake'), 500);
+                    return;
+                }
+                
                 alert('注册成功！请登录...');
                 document.getElementById('register-form').classList.add('hidden');
                 document.getElementById('login-form').classList.remove('hidden');
-            }, 1500);
+            } catch (err) {
+                errorMessage.textContent = '网络连接失败，请检查后端是否运行';
+                errorMessage.classList.remove('hidden');
+            } finally {
+                registerBtn.disabled = false;
+                registerText.textContent = '注册';
+                registerSpinner.classList.add('hidden');
+            }
         }
         
-        // Check URL hash to show correct form
+        // Auto-switch to register if hash is set
         if (window.location.hash === '#register') {
             document.getElementById('login-form').classList.add('hidden');
             document.getElementById('register-form').classList.remove('hidden');
