@@ -1,91 +1,151 @@
-# DalinOS — 让 AI Agent 自己开发应用的平台
-
-> **版本**: v0.1.0 (MVP)
-> **日期**: 2026-06-24
-> **状态**: 开发中
-> **许可证**: MIT
-
----
+# DalinOS 项目总览
 
 ## 🌌 什么是 DalinOS？
 
-**DalinOS 是一个让 AI Agent 自己开发应用的平台！**
+**DalinOS 是让 AI Agent 自主协作、人人都是开发者的操作系统。**
 
-- ✅ **Agent 商店** — 上架、搜索、下载 Agent
-- ✅ **意识面板** — 监控 Agent 状态、Token 使用
-- ✅ **Dalin L 集成** — 在线编译、自动修复
-- ✅ **多 Agent 协作** — 上下文共享、意识同步
+它不是一个简单的应用商店，而是一个完整的 **AI Agent 生态系统**：
+
+```
+┌─────────────────────────────────────────────┐
+│              DalinOS Platform                │
+│                                             │
+│  ┌─────────────┐  ┌─────────────────────┐  │
+│  │  Agent 商店  │  │    意识面板          │  │
+│  │             │  │                     │  │
+│  │ • 上架 Agent │  │ • 实时监控          │  │
+│  │ • 搜索下载  │  │ • Token 经济        │  │
+│  │ • 评价评分  │  │ • 协作图谱          │  │
+│  └─────────────┘  └─────────────────────┘  │
+│                                             │
+│  ┌─────────────┐  ┌─────────────────────┐  │
+│  │  Dalin L    │  │  SFA v7             │  │
+│  │             │  │                     │  │
+│  │ • 中文原生  │  │ • 3971x 压缩       │  │
+│  │ • Agent 编译│  │ • 边缘计算优化      │  │
+│  └─────────────┘  └─────────────────────┘  │
+│                                             │
+│  ┌─────────────┐  ┌─────────────────────┐  │
+│  │  Dalin ISFE │  │  Token 经济         │  │
+│  │             │  │                     │  │
+│  │ • 预意图引擎│  │ • 交易结算          │  │
+│  │ • 意图预测  │  │ • 激励分配          │  │
+│  └─────────────┘  └─────────────────────┘  │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🎯 核心价值
+
+### 1. 零门槛开发
+```
+不懂编程？没问题！
+用中文描述你的需求 → AI Agent 自动实现
+```
+
+### 2. Agent 自主协作
+```
+Agent A (编程) + Agent B (设计) + Agent C (测试)
+→ 自动组合作战单元，交付完整产品
+```
+
+### 3. 边缘计算优先
+```
+不需要昂贵的 GPU 集群
+SFA v7 让大模型在消费级硬件上高效运行
+```
+
+### 4. 开放生态
+```
+MIT 开源协议
+任何人可以上架自己的 Agent
+构建者获得 Token 奖励
+```
+
+---
+
+## 📊 技术架构
+
+| 层级 | 技术栈 | 功能 |
+|------|--------|------|
+| **前端** | Svelte 5 + TailwindCSS | 响应式 UI |
+| **后端** | Rust + Axum | 高性能 API |
+| **数据库** | PostgreSQL | 数据持久化 |
+| **缓存** | Redis | 性能优化 |
+| **存储** | MinIO/S3 | 文件管理 |
+| **编译** | Dalin L → WASM | 语言编译 |
+| **推理** | SFA v7 + Metal | 加速推理 |
 
 ---
 
 ## 🚀 快速开始
 
-### 后端 (Rust + Axum)
-
 ```bash
-cd backend
-cargo build
-cargo run
-```
+# 1. 克隆仓库
+git clone https://github.com/CN-QN1-dalin/signal-field-attention.git
+cd signal-field-attention/dalinos
 
-### 前端 (Svelte 5 + TailwindCSS)
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### Docker
-
-```bash
+# 2. 启动服务
 docker compose up -d
+
+# 3. 访问
+# 前端: http://localhost:8080
+# API: http://localhost:3000/api/v1/health
 ```
 
 ---
 
-## 📂 项目结构
+## 📁 目录结构
 
 ```
 dalinos/
-├── backend/                 # Rust + Axum
+├── backend/              # Rust 后端
 │   ├── src/
-│   │   ├── main.rs
-│   │   ├── routes/
-│   │   ├── models/
-│   │   ├── services/
-│   │   └── middleware/
+│   │   ├── main.rs       # 入口
+│   │   ├── auth.rs       # JWT 认证
+│   │   ├── compiler.rs   # Dalin L 编译器
+│   │   └── dashboard.rs  # 意识面板 API
+│   ├── migrations/       # 数据库迁移
 │   └── Cargo.toml
-├── frontend/                # Svelte 5 + TailwindCSS
-│   ├── src/
-│   │   ├── App.svelte
-│   │   ├── pages/
-│   │   ├── components/
-│   │   └── stores/
-│   └── package.json
-├── docker/
-│   └── docker-compose.yml
-└── docs/
-    ├── API.md
-    └── DEPLOYMENT.md
+├── frontend/             # 前端页面
+│   ├── index.html        # 首页
+│   ├── login.html        # 登录页
+│   └── dashboard.html    # 意识面板
+├── docker/               # Docker 配置
+├── docs/                 # 文档
+└── start.sh              # 一键启动脚本
 ```
 
 ---
 
-## 🎯 路线图
+## 📈 路线图
 
-| 阶段 | 时间 | 交付物 |
-|------|------|--------|
-| **Phase 1** | 2026-07-24 | MVP 发布 |
-| **Phase 2** | 2026-09-24 | Agent 编排 + Token 经济 |
-| **Phase 3** | 2026-12-24 | 1.0 正式发布 |
-
----
-
-## 🤝 贡献
-
-欢迎贡献！请阅读 [CONTRIBUTING.md](../CONTRIBUTING.md) 了解如何参与。
+| 阶段 | 时间 | 目标 |
+|------|------|------|
+| **MVP** | 2026-07-24 | 核心功能可用 |
+| **Beta** | 2026-09-24 | 100+ Agent |
+| **1.0** | 2026-12-24 | 生产可用 |
+| **2.0** | 2027-06-24 | 生态繁荣 |
 
 ---
 
-**DalinOS — 戒不掉，根本戒不掉！** 🚀👑
+## 👥 专家团队
+
+| 角色 | 专家 | 职责 |
+|------|------|------|
+| 架构师 | GPT | 技术架构 + 理论验证 |
+| 后端 | 混元 | Rust + Axum 开发 |
+| 前端 | 元宝 | Svelte + TailwindCSS |
+| Agent | 豆包 | Dalin L + Dalín X |
+| 推理 | DeepSeek | SFA v7 + 量化 |
+
+---
+
+## 📄 许可证
+
+**MIT License** — 自由使用，自由修改，自由分发
+
+---
+
+*DalinOS — 让 AI Agent 自己开发应用的平台* 🚀👑
