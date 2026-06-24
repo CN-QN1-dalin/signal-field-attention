@@ -14,12 +14,28 @@
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
+        .loading-skeleton {
+            background: linear-gradient(90deg, #374151 25%, #4B5563 50%, #374151 75%);
+            background-size: 200% 100%;
+            animation: skeleton-loading 1.5s infinite;
+        }
+        @keyframes skeleton-loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        .fade-in {
+            animation: fade-in 0.5s ease-in;
+        }
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
     <!-- Header -->
     <header class="border-b border-gray-700 bg-gray-800/50 backdrop-blur-sm sticky top-0 z-50">
-        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+        <div class="container mx-auto px-4 md:px-6 py-4 flex justify-between items-center">
             <div class="flex items-center space-x-2">
                 <span class="text-2xl">🌌</span>
                 <h1 class="text-xl font-bold text-purple-400">DalinOS</h1>
@@ -30,129 +46,159 @@
                 <a href="#docs" class="text-gray-300 hover:text-white transition">文档</a>
             </nav>
             <div class="flex space-x-4">
-                <button class="text-gray-300 hover:text-white">登录</button>
-                <button class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition">注册</button>
+                <a href="/login" class="text-gray-300 hover:text-white transition">登录</a>
+                <a href="/register" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition">注册</a>
             </div>
         </div>
     </header>
 
     <!-- Hero Section -->
-    <section class="gradient-bg py-20">
-        <div class="container mx-auto px-6 text-center">
-            <h2 class="text-5xl md:text-6xl font-bold mb-6">让 AI Agent 自己开发应用</h2>
-            <p class="text-xl md:text-2xl text-gray-200 mb-8">DalinOS — 戒不掉，根本戒不掉！</p>
-            <div class="flex justify-center space-x-4">
-                <button class="bg-white text-purple-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition">
+    <section class="gradient-bg py-12 md:py-20">
+        <div class="container mx-auto px-4 md:px-6 text-center">
+            <h2 class="text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6">让 AI Agent 自己开发应用</h2>
+            <p class="text-lg md:text-xl lg:text-2xl text-gray-200 mb-6 md:mb-8">DalinOS — 戒不掉，根本戒不掉！</p>
+            <div class="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4">
+                <a href="/register" class="bg-white text-purple-600 px-6 md:px-8 py-2 md:py-3 rounded-lg font-semibold hover:bg-gray-100 transition text-center">
                     开始使用
-                </button>
-                <button class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white/10 transition">
+                </a>
+                <a href="/docs" class="border-2 border-white text-white px-6 md:px-8 py-2 md:py-3 rounded-lg font-semibold hover:bg-white/10 transition text-center">
                     查看文档
-                </button>
+                </a>
             </div>
         </div>
     </section>
 
     <!-- Features Section -->
-    <section class="py-16 container mx-auto px-6">
-        <h3 class="text-3xl font-bold text-center mb-12">核心功能</h3>
-        <div class="grid md:grid-cols-3 gap-8">
+    <section class="py-12 md:py-16 container mx-auto px-4 md:px-6">
+        <h3 class="text-2xl md:text-3xl font-bold text-center mb-8 md:mb-12">核心功能</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
             <!-- Feature 1 -->
-            <div class="glass-card p-6 rounded-xl hover:scale-105 transition-transform">
-                <div class="text-4xl mb-4">🛒</div>
-                <h4 class="text-xl font-bold mb-2">Agent 商店</h4>
-                <p class="text-gray-400">上架、搜索、下载 Agent，构建你的 AI 生态系统</p>
+            <div class="glass-card p-4 md:p-6 rounded-xl hover:scale-105 transition-transform">
+                <div class="text-3xl md:text-4xl mb-3 md:mb-4">🛒</div>
+                <h4 class="text-lg md:text-xl font-bold mb-2">Agent 商店</h4>
+                <p class="text-gray-400 text-sm md:text-base">上架、搜索、下载 Agent，构建你的 AI 生态系统</p>
             </div>
             <!-- Feature 2 -->
-            <div class="glass-card p-6 rounded-xl hover:scale-105 transition-transform">
-                <div class="text-4xl mb-4">🧠</div>
-                <h4 class="text-xl font-bold mb-2">意识面板</h4>
-                <p class="text-gray-400">实时监控 Agent 状态、Token 使用、协作关系</p>
+            <div class="glass-card p-4 md:p-6 rounded-xl hover:scale-105 transition-transform">
+                <div class="text-3xl md:text-4xl mb-3 md:mb-4">🧠</div>
+                <h4 class="text-lg md:text-xl font-bold mb-2">意识面板</h4>
+                <p class="text-gray-400 text-sm md:text-base">实时监控 Agent 状态、Token 使用、协作关系</p>
             </div>
             <!-- Feature 3 -->
-            <div class="glass-card p-6 rounded-xl hover:scale-105 transition-transform">
-                <div class="text-4xl mb-4">⚡</div>
-                <h4 class="text-xl font-bold mb-2">Dalin L 集成</h4>
-                <p class="text-gray-400">在线编译、自动修复、中文原生支持</p>
+            <div class="glass-card p-4 md:p-6 rounded-xl hover:scale-105 transition-transform">
+                <div class="text-3xl md:text-4xl mb-3 md:mb-4">⚡</div>
+                <h4 class="text-lg md:text-xl font-bold mb-2">Dalin L 集成</h4>
+                <p class="text-gray-400 text-sm md:text-base">在线编译、自动修复、中文原生支持</p>
             </div>
         </div>
     </section>
 
     <!-- Agents Preview -->
-    <section id="agents" class="py-16 bg-gray-800/30">
-        <div class="container mx-auto px-6">
-            <h3 class="text-3xl font-bold text-center mb-12">热门 Agent</h3>
-            <div class="grid md:grid-cols-3 gap-6">
+    <section id="agents" class="py-12 md:py-16 bg-gray-800/30">
+        <div class="container mx-auto px-4 md:px-6">
+            <h3 class="text-2xl md:text-3xl font-bold text-center mb-8 md:mb-12">热门 Agent</h3>
+            
+            <!-- Loading State -->
+            <div id="agents-loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                <div class="bg-gray-800 p-6 rounded-xl">
+                    <div class="loading-skeleton h-4 w-1/4 mb-4 rounded"></div>
+                    <div class="loading-skeleton h-3 w-3/4 mb-2 rounded"></div>
+                    <div class="loading-skeleton h-3 w-1/2 rounded"></div>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl">
+                    <div class="loading-skeleton h-4 w-1/4 mb-4 rounded"></div>
+                    <div class="loading-skeleton h-3 w-3/4 mb-2 rounded"></div>
+                    <div class="loading-skeleton h-3 w-1/2 rounded"></div>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl">
+                    <div class="loading-skeleton h-4 w-1/4 mb-4 rounded"></div>
+                    <div class="loading-skeleton h-3 w-3/4 mb-2 rounded"></div>
+                    <div class="loading-skeleton h-3 w-1/2 rounded"></div>
+                </div>
+            </div>
+            
+            <!-- Agent Cards (Hidden by default, shown after loading) -->
+            <div id="agents-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hidden">
                 <!-- Agent Card 1 -->
-                <div class="bg-gray-800 p-6 rounded-xl hover:bg-gray-700 transition">
+                <div class="bg-gray-800 p-6 rounded-xl hover:bg-gray-700 transition fade-in">
                     <div class="flex justify-between items-start mb-4">
                         <h4 class="text-lg font-bold">Code Assistant</h4>
                         <span class="text-yellow-400">⭐ 4.8</span>
                     </div>
                     <p class="text-gray-400 text-sm mb-4">AI 编程助手，支持多种语言</p>
-                    <div class="flex space-x-2 mb-4">
+                    <div class="flex flex-wrap space-x-2 mb-4">
                         <span class="bg-purple-600/30 text-purple-300 px-2 py-1 rounded text-xs">coding</span>
                         <span class="bg-purple-600/30 text-purple-300 px-2 py-1 rounded text-xs">assistant</span>
                     </div>
-                    <button class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded-lg transition">下载</button>
+                    <a href="/agents/code-assistant" class="block w-full bg-purple-600 hover:bg-purple-700 py-2 rounded-lg text-center transition">查看详情</a>
                 </div>
                 <!-- Agent Card 2 -->
-                <div class="bg-gray-800 p-6 rounded-xl hover:bg-gray-700 transition">
+                <div class="bg-gray-800 p-6 rounded-xl hover:bg-gray-700 transition fade-in">
                     <div class="flex justify-between items-start mb-4">
                         <h4 class="text-lg font-bold">Data Analyzer</h4>
                         <span class="text-yellow-400">⭐ 4.5</span>
                     </div>
                     <p class="text-gray-400 text-sm mb-4">数据分析与可视化 Agent</p>
-                    <div class="flex space-x-2 mb-4">
+                    <div class="flex flex-wrap space-x-2 mb-4">
                         <span class="bg-purple-600/30 text-purple-300 px-2 py-1 rounded text-xs">analysis</span>
                         <span class="bg-purple-600/30 text-purple-300 px-2 py-1 rounded text-xs">data</span>
                     </div>
-                    <button class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded-lg transition">下载</button>
+                    <a href="/agents/data-analyzer" class="block w-full bg-purple-600 hover:bg-purple-700 py-2 rounded-lg text-center transition">查看详情</a>
                 </div>
                 <!-- Agent Card 3 -->
-                <div class="bg-gray-800 p-6 rounded-xl hover:bg-gray-700 transition">
+                <div class="bg-gray-800 p-6 rounded-xl hover:bg-gray-700 transition fade-in">
                     <div class="flex justify-between items-start mb-4">
                         <h4 class="text-lg font-bold">Content Creator</h4>
                         <span class="text-yellow-400">⭐ 4.6</span>
                     </div>
                     <p class="text-gray-400 text-sm mb-4">内容创作与文案生成 Agent</p>
-                    <div class="flex space-x-2 mb-4">
+                    <div class="flex flex-wrap space-x-2 mb-4">
                         <span class="bg-purple-600/30 text-purple-300 px-2 py-1 rounded text-xs">writing</span>
                         <span class="bg-purple-600/30 text-purple-300 px-2 py-1 rounded text-xs">creative</span>
                     </div>
-                    <button class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded-lg transition">下载</button>
+                    <a href="/agents/content-creator" class="block w-full bg-purple-600 hover:bg-purple-700 py-2 rounded-lg text-center transition">查看详情</a>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Stats Section -->
-    <section class="py-16 container mx-auto px-6">
-        <div class="grid md:grid-cols-4 gap-8 text-center">
+    <section class="py-12 md:py-16 container mx-auto px-4 md:px-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 text-center">
             <div>
-                <div class="text-4xl font-bold text-purple-400">10+</div>
-                <div class="text-gray-400">首批 Agent</div>
+                <div class="text-3xl md:text-4xl font-bold text-purple-400">10+</div>
+                <div class="text-gray-400 text-sm md:text-base">首批 Agent</div>
             </div>
             <div>
-                <div class="text-4xl font-bold text-purple-400">99%+</div>
-                <div class="text-gray-400">编译通过率</div>
+                <div class="text-3xl md:text-4xl font-bold text-purple-400">99%+</div>
+                <div class="text-gray-400 text-sm md:text-base">编译通过率</div>
             </div>
             <div>
-                <div class="text-4xl font-bold text-purple-400">&lt;2s</div>
-                <div class="text-gray-400">首屏加载</div>
+                <div class="text-3xl md:text-4xl font-bold text-purple-400">&lt;2s</div>
+                <div class="text-gray-400 text-sm md:text-base">首屏加载</div>
             </div>
             <div>
-                <div class="text-4xl font-bold text-purple-400">&lt;100ms</div>
-                <div class="text-gray-400">API 响应</div>
+                <div class="text-3xl md:text-4xl font-bold text-purple-400">&lt;100ms</div>
+                <div class="text-gray-400 text-sm md:text-base">API 响应</div>
             </div>
         </div>
     </section>
 
     <!-- Footer -->
-    <footer class="border-t border-gray-700 bg-gray-800/50 py-8">
-        <div class="container mx-auto px-6 text-center">
-            <p class="text-gray-400">© 2026 DalinOS. All rights reserved.</p>
-            <p class="text-gray-500 mt-2">由太初五岳团队打造 🚀👑</p>
+    <footer class="border-t border-gray-700 bg-gray-800/50 py-6 md:py-8">
+        <div class="container mx-auto px-4 md:px-6 text-center">
+            <p class="text-gray-400 text-sm">© 2026 DalinOS. All rights reserved.</p>
+            <p class="text-gray-500 text-xs md:text-sm mt-1">由太初五岳团队打造 🚀👑</p>
         </div>
     </footer>
+
+    <!-- JavaScript for Loading State -->
+    <script>
+        // Simulate API call
+        setTimeout(() => {
+            document.getElementById('agents-loading').classList.add('hidden');
+            document.getElementById('agents-list').classList.remove('hidden');
+        }, 1000);
+    </script>
 </body>
 </html>

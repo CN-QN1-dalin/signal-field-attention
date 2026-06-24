@@ -1,16 +1,31 @@
 use axum::{
     Router,
     routing::{get, post, put, delete},
-    extract::{State, Path, Query, Json as JsonReq},
-    http::StatusCode,
+    extract::{State, Path, Query, Json as JsonReq, Request, IntoResponse},
+    http::{StatusCode, HeaderValue},
     response::Json,
+    middleware::{from_fn, Next},
+    body::Body,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 use std::collections::HashMap;
+use std::time::Duration;
+use tower_limit::RateLimitLayer;
+use nonempty::NonEmpty;
 
 // ==================== Models ====================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct User {
+    pub id: Uuid,
+    pub username: String,
+    pub email: String,
+    pub avatar_url: Option<String>,
+    pub role: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Agent {
@@ -60,6 +75,27 @@ pub struct Review {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoginResponse {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub user: User,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RegisterRequest {
+    pub username: String,
+    pub email: String,
+    pub password: String,
+    pub password_confirm: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LoginRequest {
+    pub email: String,
+    pub password: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct CreateAgentRequest {
     pub name: String,
@@ -103,7 +139,70 @@ pub struct CompileResponse {
     pub suggestions: Vec<String>,
 }
 
-// ==================== Helpers ====================
+#[derive(Debug, Serialize)]
+pub struct HealthResponse {
+    pub status: String,
+    pub database: String,
+    pub redis: String,
+    pub version: String,
+}
+
+// ==================== Middleware ====================
+
+// 输入验证中间件
+async fn validate_input(
+    req: Request,
+    next: Next,
+) -> impl IntoResponse {
+    // 验证 Content-Type
+    let content_type = req.headers().get("Content-Type");
+    if content_type.is_some() {
+        let ct = content_type.unwrap().to_str().unwrap_or("");
+        if !ct.contains("application/json") && !ct.contains("multipart/form-data") {
+            return (StatusCode::UNSUPPORTED_MEDIA_TYPE, "Invalid content type").into_response();
+        }
+    }
+    
+    next.run(req).await
+}
+
+// 速率限制中间件
+async fn rate_limit(
+    State(state): State<AppState>,
+    req: Request,
+    next: Next,
+) -> impl IntoResponse {
+    // TODO: 实现基于 IP 的速率限制
+    next.run(req).await
+}
+
+// JWT 认证中间件
+async fn auth_required(
+    State(state): State<AppState>,
+    req: Request,
+    next: Next,
+) -> impl IntoResponse {
+    // 从 Authorization header 获取 token
+    let auth_header = req.headers().get("Authorization");
+    
+    if auth_header.is_none() {
+        return (StatusCode::UNAUTHORIZED, "Missing authorization header").into_response();
+    }
+    
+    let token = auth_header.unwrap().to_str().unwrap_or("");
+    if !token.starts_with("Bearer ") {
+        return (StatusCode::UNAUTHORIZED, "Invalid token format").into_response();
+    }
+    
+    let token = &token[7..];
+    
+    // TODO: 验证 JWT token
+    // 这里简化处理，实际应该验证签名、过期时间等
+    
+    next.run(req).await
+}
+
+// ==================== Helper Functions ====================
 
 fn generate_slug(name: &str) -> String {
     name.to_lowercase()
@@ -111,6 +210,192 @@ fn generate_slug(name: &str) -> String {
         .collect::<Vec<_>>()
         .join("-")
         .replace(|c: char| !c.is_alphanumeric() && c != '-', "")
+}
+
+fn validate_name(name: &str) -> Result<(), String> {
+    if name.len() < 2 || name.len() > 100 {
+        return Err("Name must be between 2 and 100 characters".to_string());
+    }
+    
+    if !name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c.is_whitespace()) {
+        return Err("Name contains invalid characters".to_string());
+    }
+    
+    Ok(())
+}
+
+fn validate_email(email: &str) -> Result<(), String> {
+    if !email.contains('@') || !email.contains('.') {
+        return Err("Invalid email format".to_string());
+    }
+    
+    Ok(())
+}
+
+fn validate_password(password: &str) -> Result<(), String> {
+    if password.len() < 8 {
+        return Err("Password must be at least 8 characters".to_string());
+    }
+    
+    if !password.chars().any(|c| c.is_uppercase()) {
+        return Err("Password must contain at least one uppercase letter".to_string());
+    }
+    
+    if !password.chars().any(|c| c.is_lowercase()) {
+        return Err("Password must contain at least one lowercase letter".to_string());
+    }
+    
+    if !password.chars().any(|c| c.is_digit(10)) {
+        return Err("Password must contain at least one digit".to_string());
+    }
+    
+    Ok(())
+}
+
+// ==================== Auth Routes ====================
+
+/// POST /api/v1/auth/register - 用户注册
+async fn register(
+    State(state): State<AppState>,
+    JsonReq(req): JsonReq<RegisterRequest>,
+) -> Result<(StatusCode, Json<User>), (StatusCode, String)> {
+    let pool = &state.pool;
+    
+    // 验证输入
+    validate_name(&req.username).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    validate_email(&req.email).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    validate_password(&req.password).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    
+    if req.password != req.password_confirm {
+        return Err((StatusCode::BAD_REQUEST, "Passwords do not match".to_string()));
+    }
+    
+    // 检查用户名是否已存在
+    let exists: (i64,) = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE username = $1")
+        .bind(&req.username)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    
+    if exists.0 > 0 {
+        return Err((StatusCode::CONFLICT, "Username already exists".to_string()));
+    }
+    
+    // 检查邮箱是否已存在
+    let exists: (i64,) = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE email = $1")
+        .bind(&req.email)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    
+    if exists.0 > 0 {
+        return Err((StatusCode::CONFLICT, "Email already exists".to_string()));
+    }
+    
+    // TODO: 密码 bcrypt 哈希
+    let password_hash = "$2b$12$example_hash"; // Placeholder
+    
+    // 创建用户
+    let user = sqlx::query_as::<_, User>(r#"
+        INSERT INTO users (username, email, password_hash)
+        VALUES ($1, $2, $3)
+        RETURNING id, username, email, avatar_url, role, created_at
+    "#)
+    .bind(&req.username)
+    .bind(&req.email)
+    .bind(password_hash)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    
+    // TODO: 发送验证邮件
+    
+    Ok((StatusCode::CREATED, Json(user)))
+}
+
+/// POST /api/v1/auth/login - 用户登录
+async fn login(
+    State(state): State<AppState>,
+    JsonReq(req): JsonReq<LoginRequest>,
+) -> Result<Json<LoginResponse>, (StatusCode, String)> {
+    let pool = &state.pool;
+    
+    // 查找用户
+    let user: User = sqlx::query_as::<_, User>(r#"
+        SELECT id, username, email, avatar_url, role, created_at
+        FROM users
+        WHERE email = $1
+    "#)
+    .bind(&req.email)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .ok_or((StatusCode::UNAUTHORIZED, "Invalid email or password".to_string()))?;
+    
+    // TODO: 验证密码 (bcrypt)
+    let password_valid = true; // Placeholder
+    
+    if !password_valid {
+        return Err((StatusCode::UNAUTHORIZED, "Invalid email or password".to_string()));
+    }
+    
+    // TODO: 生成 JWT access token
+    let access_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example";
+    
+    // TODO: 生成 refresh token 并保存到数据库
+    let refresh_token = generate_secure_token(32);
+    
+    Ok(Json(LoginResponse {
+        access_token: access_token.to_string(),
+        refresh_token: refresh_token,
+        user,
+    }))
+}
+
+/// POST /api/v1/auth/refresh - 刷新 Token
+async fn refresh_token(
+    State(state): State<AppState>,
+    JsonReq(req): JsonReq<RefreshTokenRequest>,
+) -> Result<Json<LoginResponse>, (StatusCode, String)> {
+    let pool = &state.pool;
+    
+    // TODO: 验证 refresh token
+    // TODO: 生成新的 access token
+    
+    Ok(Json(LoginResponse {
+        access_token: "new_access_token".to_string(),
+        refresh_token: req.refresh_token,
+        user: User {
+            id: Uuid::nil(),
+            username: "user".to_string(),
+            email: "user@example.com".to_string(),
+            avatar_url: None,
+            role: "user".to_string(),
+            created_at: chrono::Utc::now(),
+        },
+    }))
+}
+
+/// POST /api/v1/auth/logout - 登出
+async fn logout(
+    State(state): State<AppState>,
+    JsonReq(req): JsonReq<LogoutRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let pool = &state.pool;
+    
+    // TODO: 撤销 refresh token
+    
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RefreshTokenRequest {
+    pub refresh_token: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LogoutRequest {
+    pub refresh_token: String,
 }
 
 // ==================== Agent Routes ====================
@@ -125,55 +410,45 @@ async fn list_agents(
     let limit = params.limit.unwrap_or(20) as i64;
     let offset = (((params.page.unwrap_or(1)) - 1) * limit) as i64;
     
-    let query = format!(
-        r#"
+    let query = r#"
         SELECT a.*, u.username as author_name
         FROM agents a
         LEFT JOIN users u ON a.author_id = u.id
         WHERE a.status = 'active'
-        {}
-        {}
+        AND ($1::text IS NULL OR a.category = $1)
+        AND ($2::text IS NULL OR $2 = ANY(a.tags))
+        AND ($3::text IS NULL OR a.name ILIKE '%' || $3 || '%')
         ORDER BY 
-            CASE WHEN $1 = 'rating' THEN a.rating END DESC,
-            CASE WHEN $1 = 'downloads' THEN a.download_count END DESC,
+            CASE WHEN $4 = 'rating' THEN a.rating END DESC,
+            CASE WHEN $4 = 'downloads' THEN a.download_count END DESC,
             a.created_at DESC
-        LIMIT $2 OFFSET $3
-        "#,
-        // WHERE clauses
-        match (&params.category, &params.tag, &params.search) {
-            (Some(cat), _, _) => format!("AND a.category = '{}'", cat),
-            (_, Some(tag), _) => format!("AND $4 = ANY(a.tags)"),
-            (_, _, Some(search)) => format!("AND (a.name ILIKE '%{}%' OR a.description ILIKE '%{}%')", search, search),
-            _ => String::new(),
-        },
-        // Sort
-        match params.sort.as_deref() {
-            Some("featured") => "AND a.is_featured = TRUE".to_string(),
-            _ => String::new(),
-        }
-    );
+        LIMIT $5 OFFSET $6
+    "#;
     
-    let mut qb = sqlx::query_as::<_, Agent>(&query);
-    qb = qb.bind(params.sort.as_deref().unwrap_or(""));
-    qb = qb.bind(limit);
-    qb = qb.bind(offset);
-    if params.tag.is_some() {
-        qb = qb.bind(&params.tag);
-    }
-    
-    let agents = qb.fetch_all(pool).await.map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-    })?;
+    let agents = sqlx::query_as::<_, Agent>(query)
+        .bind(&params.category)
+        .bind(&params.tag)
+        .bind(&params.search)
+        .bind(params.sort.as_deref().unwrap_or(""))
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     
     Ok(Json(agents))
 }
 
-/// POST /api/v1/agents - 创建 Agent
+/// POST /api/v1/agents - 创建 Agent (需要认证)
 async fn create_agent(
     State(state): State<AppState>,
     JsonReq(req): JsonReq<CreateAgentRequest>,
 ) -> Result<(StatusCode, Json<Agent>), (StatusCode, String)> {
     let pool = &state.pool;
+    
+    // 验证输入
+    validate_name(&req.name).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    
     let slug = generate_slug(&req.name);
     
     // 检查 slug 是否已存在
@@ -316,7 +591,7 @@ async fn get_agent_versions(
 
 // ==================== Review Routes ====================
 
-/// POST /api/v1/agents/:slug/reviews - 创建评价
+/// POST /api/v1/agents/:slug/reviews - 创建评价 (需要认证)
 async fn create_review(
     State(state): State<AppState>,
     Path(slug): Path<String>,
@@ -400,13 +675,14 @@ async fn compile_code(
     // 这里返回模拟响应
     
     let has_error = req.code.contains("error") || req.code.contains("ERROR");
+    let has_warning = req.code.contains("warning") || req.code.contains("WARNING");
     
     if has_error {
         Json(CompileResponse {
             success: false,
             output: String::new(),
             errors: vec!["Syntax error: unexpected token".to_string()],
-            warnings: vec!["Consider using type annotations".to_string()],
+            warnings: if has_warning { vec!["Consider using type annotations".to_string()] } else { vec![] },
             suggestions: vec![
                 "Check variable types".to_string(),
                 "Use 'let' for immutable bindings".to_string(),
@@ -426,13 +702,29 @@ async fn compile_code(
 // ==================== Health Check ====================
 
 /// GET /api/v1/health - 健康检查
-async fn health_check() -> Json<HashMap<&str, &str>> {
-    let mut map = HashMap::new();
-    map.insert("status", "ok");
-    map.insert("service", "dalinos-backend");
-    map.insert("version", "0.1.0");
-    map.insert("database", "connected");
-    map
+async fn health_check(State(state): State<AppState>) -> Json<HealthResponse> {
+    // 检查数据库连接
+    let db_status = sqlx::query("SELECT 1")
+        .fetch_one(&state.pool)
+        .await
+        .map(|_| "connected".to_string())
+        .unwrap_or_else(|_| "disconnected".to_string());
+    
+    // 检查 Redis 连接 (TODO: 添加 Redis 客户端)
+    let redis_status = "disconnected"; // Placeholder
+    
+    let overall_status = if db_status == "connected" && redis_status == "connected" {
+        "ok"
+    } else {
+        "degraded"
+    };
+    
+    Json(HealthResponse {
+        status: overall_status.to_string(),
+        database: db_status,
+        redis: redis_status.to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
+    })
 }
 
 // ==================== State ====================
@@ -440,6 +732,7 @@ async fn health_check() -> Json<HashMap<&str, &str>> {
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
+    // pub redis: RedisClient, // TODO: 添加 Redis 客户端
 }
 
 // ==================== Routes Setup ====================
@@ -449,24 +742,62 @@ pub fn create_routes(state: AppState) -> Router<AppState> {
         // Health
         .route("/api/v1/health", get(health_check))
         
-        // Agents
-        .route("/api/v1/agents", get(list_agents).post(create_agent))
-        .route("/api/v1/agents/{slug}", get(get_agent).put(update_agent).delete(delete_agent))
+        // Auth (public)
+        .route("/api/v1/auth/register", post(register))
+        .route("/api/v1/auth/login", post(login))
+        .route("/api/v1/auth/refresh", post(refresh_token))
+        .route("/api/v1/auth/logout", post(logout))
+        
+        // Agents (部分需要认证)
+        .route("/api/v1/agents", get(list_agents).post(with_state(create_agent_wrapper)))
+        .route("/api/v1/agents/{slug}", get(get_agent).put(with_state(update_agent_wrapper)).delete(with_state(delete_agent_wrapper)))
         .route("/api/v1/agents/{slug}/versions", get(get_agent_versions))
         .route("/api/v1/agents/{slug}/reviews", get(get_agent_reviews))
         
-        // Reviews
-        .route("/api/v1/agents/{slug}/reviews", post(create_review))
+        // Reviews (需要认证)
+        .route("/api/v1/agents/{slug}/reviews", post(with_state(create_review_wrapper)))
         
-        // Compile
+        // Compile (需要认证)
         .route("/api/v1/compile", post(compile_code))
         
         // State
         .with_state(state)
         
         // Middleware
+        .layer(from_fn(validate_input))
         .layer(tower_http::cors::CorsLayer::permissive())
         .layer(tower_http::trace::TraceLayer::new_for_http())
+}
+
+// Wrapper functions to work with middleware
+async fn create_agent_wrapper(
+    State(state): State<AppState>,
+    JsonReq(req): JsonReq<CreateAgentRequest>,
+) -> Result<(StatusCode, Json<Agent>), (StatusCode, String)> {
+    create_agent(State(state), JsonReq(req)).await
+}
+
+async fn update_agent_wrapper(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+    JsonReq(req): JsonReq<CreateAgentRequest>,
+) -> Result<Json<Agent>, (StatusCode, String)> {
+    update_agent(State(state), Path(slug), JsonReq(req)).await
+}
+
+async fn delete_agent_wrapper(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    delete_agent(State(state), Path(slug)).await
+}
+
+async fn create_review_wrapper(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+    JsonReq(req): JsonReq<CreateReviewRequest>,
+) -> Result<(StatusCode, Json<Review>), (StatusCode, String)> {
+    create_review(State(state), Path(slug), JsonReq(req)).await
 }
 
 // ==================== Main ====================
@@ -483,7 +814,11 @@ async fn main() {
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://dalinos:dalinos_password@localhost:5432/dalinos".to_string());
     
-    let pool = PgPool::connect(&database_url)
+    let pool = PgPool::builder(&database_url)
+        .max_connections(20)
+        .min_connections(5)
+        .connection_timeout(Duration::from_secs(30))
+        .build()
         .await
         .expect("Failed to connect to database");
     
